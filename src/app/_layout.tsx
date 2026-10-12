@@ -21,6 +21,7 @@ function RootNavigator() {
       <Stack.Protected guard={!isRecovering && !!session && !!username}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="predictions" />
+        <Stack.Screen name="match/[id]" />
         <Stack.Screen name="create-league" />
         <Stack.Screen name="explore" />
       </Stack.Protected>

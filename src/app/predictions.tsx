@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -12,6 +11,7 @@ import {
   View
 } from 'react-native';
 
+import { LOGO_SIZE, TeamLogo } from '../components/team-logo';
 import { supabase } from '../supabase';
 
 type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled';
@@ -50,6 +50,9 @@ const STATUS_LABEL: Partial<Record<MatchStatus, string>> = {
   postponed: 'נדחה',
   cancelled: 'בוטל',
 };
+
+// The logo sits in a slot as tall as the score area so its center lines up with the score digits
+const SCORE_BOX_HEIGHT = 116;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -324,7 +327,9 @@ export default function PredictionsScreen() {
 
                   <View style={styles.matchRow}>
                     <View style={styles.team}>
-                      <TeamLogo badge={game.home_badge} />
+                      <View style={[styles.logoSlot, open && styles.logoSlotOpen]}>
+                        <TeamLogo badge={game.home_badge} />
+                      </View>
 
                       <Text style={styles.teamName}>
                         {game.home_team}
@@ -386,7 +391,9 @@ export default function PredictionsScreen() {
                     )}
 
                     <View style={styles.team}>
-                      <TeamLogo badge={game.away_badge} />
+                      <View style={[styles.logoSlot, open && styles.logoSlotOpen]}>
+                        <TeamLogo badge={game.away_badge} />
+                      </View>
 
                       <Text style={styles.teamName}>
                         {game.away_team}
@@ -403,6 +410,17 @@ export default function PredictionsScreen() {
                         </Text>
                       )}
                     </Text>
+                  )}
+
+                  {isFinished && (
+                    <TouchableOpacity
+                      style={styles.statsButton}
+                      onPress={() =>
+                        router.push({ pathname: '/match/[id]', params: { id: String(game.id) } })
+                      }
+                    >
+                      <Text style={styles.statsButtonText}>📊 סטטיסטיקה</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               );
@@ -430,24 +448,6 @@ export default function PredictionsScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function TeamLogo({ badge }: { badge: string | null }) {
-  return (
-    <View style={styles.logoCircle}>
-      {badge ? (
-        // TheSportsDB serves a 250px version at /small, plenty for a 54px circle
-        <Image
-          source={{ uri: `${badge}/small` }}
-          style={styles.badge}
-          contentFit="contain"
-          transition={150}
-        />
-      ) : (
-        <Text style={styles.ball}>⚽</Text>
-      )}
-    </View>
   );
 }
 
@@ -583,7 +583,7 @@ saveToastText: {
 
   matchRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
 
   team: {
@@ -591,22 +591,13 @@ saveToastText: {
     alignItems: 'center',
   },
 
-  logoCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#252525',
-    alignItems: 'center',
+  logoSlot: {
+    height: LOGO_SIZE,
     justifyContent: 'center',
   },
 
-  ball: {
-    fontSize: 25,
-  },
-
-  badge: {
-    width: 42,
-    height: 42,
+  logoSlotOpen: {
+    height: SCORE_BOX_HEIGHT,
   },
 
   teamName: {
@@ -620,15 +611,17 @@ saveToastText: {
   scoreSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: LOGO_SIZE,
     gap: 8,
   },
 
   scoreBox: {
     width: 48,
+    height: SCORE_BOX_HEIGHT,
     backgroundColor: '#292929',
     borderRadius: 12,
     alignItems: 'center',
-    paddingVertical: 5,
+    justifyContent: 'center',
   },
 scoreButton: {
   width: '100%',
@@ -723,5 +716,22 @@ scoreButton: {
   pointsNone: {
     color: '#8A8A8A',
     fontWeight: '900',
+  },
+
+  statsButton: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: '#222',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+
+  statsButtonText: {
+    color: 'limegreen',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
