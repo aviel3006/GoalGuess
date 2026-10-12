@@ -39,7 +39,13 @@ export default function ResetPasswordScreen() {
     setIsSaving(false);
 
     if (error) {
-      alert('לא הצלחנו לעדכן את הסיסמה. נסה שוב.');
+      if (error.code === 'same_password') {
+        alert('הסיסמה החדשה חייבת להיות שונה מהסיסמה הקודמת');
+      } else if (error.code === 'weak_password') {
+        alert('הסיסמה חלשה מדי. נסה סיסמה ארוכה יותר עם אותיות ומספרים.');
+      } else {
+        alert(`לא הצלחנו לעדכן את הסיסמה: ${error.message}`);
+      }
       return;
     }
 
