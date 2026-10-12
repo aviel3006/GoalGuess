@@ -11,6 +11,7 @@ import {
   View
 } from 'react-native';
 
+import { useAchievementCelebration } from '../components/achievement-celebration';
 import { LOGO_SIZE, TeamLogo } from '../components/team-logo';
 import { supabase } from '../supabase';
 import { currentSeasonMatches, getRoundDeadlines, isMatchOpen } from '../utils/round-deadline';
@@ -80,6 +81,7 @@ export default function PredictionsScreen() {
   const [drafts, setDrafts] = useState<Record<number, Score>>({});
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const { check: checkAchievements } = useAchievementCelebration();
   const [showSaveMessage, setShowSaveMessage] = useState(false);
 
   const load = useCallback(async () => {
@@ -224,6 +226,9 @@ export default function PredictionsScreen() {
 
       setShowSaveMessage(true);
       setTimeout(() => setShowSaveMessage(false), 2000);
+
+      // e.g. "first prediction" or "50 predictions"
+      checkAchievements();
     } catch (error) {
       console.error('Save predictions error:', error);
       Alert.alert('שגיאה', 'הייתה בעיה בשמירת הניחושים. נסה שוב.');

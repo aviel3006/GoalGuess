@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -14,15 +14,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAchievementCelebration } from '../../components/achievement-celebration';
 import {
   ACHIEVEMENT_TIERS,
   useProfile,
   type Achievement,
-  type AchievementId,
   type AchievementTier,
   type ProfileData,
   type ProfileLeague,
 } from '../../hooks/use-profile';
+import { ACHIEVEMENT_ICONS, TIER_STYLE } from '../../utils/achievements';
 import { flagEmoji } from '../../utils/countries';
 import { confirmSignOut } from '../../utils/sign-out';
 
@@ -35,40 +36,6 @@ const MUTED = '#8FA398';
 const LEAGUES_PREVIEW = 2;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
-type McIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
-
-const ACHIEVEMENT_ICONS: Record<AchievementId, McIconName> = {
-  'first-prediction': 'soccer',
-  'first-correct': 'check-decagram',
-  'join-league': 'account-group',
-  'first-exact': 'bullseye',
-  'streak-3': 'fire',
-  'points-50': 'star',
-  'predictions-50': 'clipboard-check',
-  'streak-5': 'fire',
-  'points-100': 'chart-bar',
-  'exact-10': 'target',
-  'round-20': 'lightning-bolt',
-  'streak-10': 'fire',
-  'points-250': 'chart-line',
-  'exact-25': 'target-account',
-  'league-champion': 'trophy',
-  'global-top-10': 'earth',
-  'exact-expert': 'crosshairs-gps',
-  'points-500': 'crown',
-  'perfect-round': 'diamond-stone',
-  'global-first': 'medal',
-};
-
-// Difficulty colors, checked with the dataviz palette validator on the badge background.
-// Blue and purple are close for some colorblind users, so every badge also names its tier.
-const TIER_STYLE: Record<AchievementTier, { label: string; color: string }> = {
-  easy: { label: 'קל', color: '#8E9A94' },
-  medium: { label: 'בינוני', color: '#16A34A' },
-  hard: { label: 'קשה', color: '#1E56E0' },
-  epic: { label: 'אפי', color: '#B95CF0' },
-  legendary: { label: 'אגדי', color: '#D97706' },
-};
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -87,12 +54,18 @@ function openSettings() {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { state, refreshing, load } = useProfile();
+  const { report } = useAchievementCelebration();
 
   useFocusEffect(
     useCallback(() => {
       load();
     }, [load])
   );
+
+  // Celebrate badges unlocked since the last check, with the data this screen already loaded
+  useEffect(() => {
+    if (state.status === 'ready') report(state.data.achievements);
+  }, [state, report]);
 
   return (
     <View style={styles.screen}>

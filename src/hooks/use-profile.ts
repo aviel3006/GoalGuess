@@ -157,7 +157,7 @@ function roundResults(graded: MyPrediction[], matches: Map<number, Match>) {
   return [...rounds.values()];
 }
 
-async function loadProfile(): Promise<State> {
+export async function loadProfile(): Promise<State> {
   const {
     data: { user },
   } = await supabase.auth.getUser();

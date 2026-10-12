@@ -1,5 +1,6 @@
 import { SplashScreen, Stack } from 'expo-router';
 
+import { AchievementCelebrationProvider } from '../components/achievement-celebration';
 import { SessionProvider, useSession } from '../hooks/use-session';
 
 // If anything below throws, show a retry screen instead of crashing the app
@@ -70,7 +71,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <SessionProvider>
-      <RootNavigator />
+      <AchievementCelebrationProvider>
+        <RootNavigator />
+      </AchievementCelebrationProvider>
     </SessionProvider>
   );
 }
