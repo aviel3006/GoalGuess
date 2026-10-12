@@ -5,6 +5,8 @@ import BottomNav from '../../components/BottomNav';
 export default function TabsLayout() {
   return (
     <Tabs
+    // Back (the rules screen's arrow, Android's back button) returns to the tab you came from
+    backBehavior="history"
     tabBar={() => (
   <View style={{ backgroundColor: '#000000', paddingBottom: 6 }}>
     <BottomNav />

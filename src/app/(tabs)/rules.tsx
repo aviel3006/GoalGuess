@@ -1,15 +1,38 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import {
     ScrollView,
     StatusBar,
     StyleSheet,
     Text,
+    TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Back to whatever opened the rules (another tab, the home banner or settings).
+// Opened directly with nothing to go back to: go home.
+function goBack() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
+}
 
 export default function RulesScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+
+      <TouchableOpacity
+        style={[styles.backButton, { top: insets.top + 8 }]}
+        onPress={goBack}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="חזרה"
+      >
+        <Ionicons name="arrow-forward" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -269,6 +292,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#07110D',
+  },
+  backButton: {
+    position: 'absolute',
+    right: 16,
+    zIndex: 1,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(11, 33, 26, 0.9)',
+    borderWidth: 1,
+    borderColor: '#176B45',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     paddingHorizontal: 20,
