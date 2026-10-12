@@ -37,7 +37,12 @@ export default function ForgotPasswordScreen() {
     setIsBusy(false);
 
     if (error) {
-      alert('לא הצלחנו לשלוח קישור. נסה שוב מאוחר יותר.');
+      // Supabase's built-in mailer allows only 2 emails an hour
+      alert(
+        error.code === 'over_email_send_rate_limit'
+          ? 'שלחנו יותר מדי מיילים בשעה האחרונה. נסה שוב בעוד שעה.'
+          : 'לא הצלחנו לשלוח קישור. נסה שוב מאוחר יותר.'
+      );
       return;
     }
 

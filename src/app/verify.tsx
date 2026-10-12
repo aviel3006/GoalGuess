@@ -23,7 +23,12 @@ export default function VerifyScreen() {
     });
 
     if (error) {
-      alert('לא הצלחנו לשלוח קישור חדש. נסה שוב מאוחר יותר.');
+      // Supabase's built-in mailer allows only 2 emails an hour
+      alert(
+        error.code === 'over_email_send_rate_limit'
+          ? 'שלחנו יותר מדי מיילים בשעה האחרונה. נסה שוב בעוד שעה.'
+          : 'לא הצלחנו לשלוח קישור חדש. נסה שוב מאוחר יותר.'
+      );
       return;
     }
 
@@ -63,7 +68,8 @@ export default function VerifyScreen() {
 
           <Text style={styles.instructions}>
             שלחנו לך מייל עם קישור לאימות.{'\n'}
-            פתח את המייל בטלפון הזה ולחץ על הקישור, והאפליקציה תיפתח ותחבר אותך אוטומטית.
+            פתח את המייל בטלפון הזה ולחץ על הקישור, והאפליקציה תיפתח ותחבר אותך אוטומטית.{'\n'}
+            אם האפליקציה לא נפתחה, המייל כבר אומת: חזור לכאן והתחבר.
           </Text>
 
           <TouchableOpacity

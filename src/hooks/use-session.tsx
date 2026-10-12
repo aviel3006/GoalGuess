@@ -8,6 +8,11 @@ import { supabase } from '../supabase';
 // Must be listed under Authentication > URL Configuration > Redirect URLs in Supabase.
 export const authRedirectUrl = Linking.createURL('/');
 
+if (__DEV__) {
+  // In Expo Go this is exp://<computer-ip>:8081/--/ — the allow list needs a pattern that matches it
+  console.log('Auth email links redirect to', authRedirectUrl);
+}
+
 type SessionState = {
   session: Session | null;
   // The leaderboard name, stored in the auth user's metadata
