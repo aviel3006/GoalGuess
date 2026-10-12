@@ -136,10 +136,13 @@ export default function HomeScreen() {
 
         {/* MENU */}
         <View style={styles.menuRow}>
-          <TouchableOpacity style={styles.menuCard}>
+          <TouchableOpacity
+            style={styles.menuCard}
+            onPress={() => router.push('/news')}
+          >
             <Text style={styles.menuIcon}>📰</Text>
             <Text style={styles.menuTitle}>חדשות</Text>
-            <Text style={styles.menuSub}>כל מה שחם</Text>
+            <Text style={styles.menuSub}>על הקבוצות שלך</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

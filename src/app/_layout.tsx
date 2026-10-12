@@ -5,10 +5,14 @@ import { SessionProvider, useSession } from '../hooks/use-session';
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
-  const { session, username, favoriteLeagues, isLoading, isRecovering } = useSession();
+  const { session, username, favoriteLeagues, favoriteTeams, isLoading, isRecovering } =
+    useSession();
 
   if (isLoading) return null;
   SplashScreen.hide();
+
+  // Onboarding steps after signing in: username, then world leagues, then teams for the news
+  const isSignedIn = !isRecovering && !!session && !!username;
 
   // Screens outside the active guard redirect to the first screen available to the user
   return (
@@ -18,7 +22,7 @@ function RootNavigator() {
         <Stack.Screen name="reset-password" />
       </Stack.Protected>
 
-      <Stack.Protected guard={!isRecovering && !!session && !!username && !!favoriteLeagues}>
+      <Stack.Protected guard={isSignedIn && !!favoriteLeagues && !!favoriteTeams}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="predictions" />
         <Stack.Screen name="match/[id]" />
@@ -27,11 +31,18 @@ function RootNavigator() {
         <Stack.Screen name="explore" />
         <Stack.Screen name="world-tables" />
         <Stack.Screen name="edit-leagues" />
+        <Stack.Screen name="news" />
+        <Stack.Screen name="edit-teams" />
       </Stack.Protected>
 
       {/* Has a username but hasn't picked leagues for the world tables yet */}
-      <Stack.Protected guard={!isRecovering && !!session && !!username && !favoriteLeagues}>
+      <Stack.Protected guard={isSignedIn && !favoriteLeagues}>
         <Stack.Screen name="choose-leagues" />
+      </Stack.Protected>
+
+      {/* Picked leagues but not the Israeli league teams to follow in the news yet */}
+      <Stack.Protected guard={isSignedIn && !!favoriteLeagues && !favoriteTeams}>
+        <Stack.Screen name="choose-teams" />
       </Stack.Protected>
 
       {/* Signed in but no leaderboard name yet: new accounts land here after verifying */}

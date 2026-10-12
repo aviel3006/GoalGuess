@@ -13,12 +13,16 @@ if (__DEV__) {
   console.log('Auth email links redirect to', authRedirectUrl);
 }
 
+export type FavoriteTeams = number[] | 'all';
+
 type SessionState = {
   session: Session | null;
   // The leaderboard name, stored in the auth user's metadata
   username: string | null;
   // 365Scores competition ids picked on the choose-leagues screen; null until chosen
   favoriteLeagues: number[] | null;
+  // Israeli league teams (365Scores ids) whose news the user follows, or every team; null until chosen
+  favoriteTeams: FavoriteTeams | null;
   isLoading: boolean;
   // Signed in from a password reset link and still has to choose a new password
   isRecovering: boolean;
@@ -29,6 +33,7 @@ const SessionContext = createContext<SessionState>({
   session: null,
   username: null,
   favoriteLeagues: null,
+  favoriteTeams: null,
   isLoading: true,
   isRecovering: false,
   finishRecovery: () => {},
@@ -41,6 +46,12 @@ function usernameOf(session: Session | null): string | null {
 
 function favoriteLeaguesOf(session: Session | null): number[] | null {
   const value = session?.user.user_metadata?.favorite_leagues;
+  return Array.isArray(value) ? value.filter((id) => typeof id === 'number') : null;
+}
+
+function favoriteTeamsOf(session: Session | null): FavoriteTeams | null {
+  const value = session?.user.user_metadata?.favorite_teams;
+  if (value === 'all') return 'all';
   return Array.isArray(value) ? value.filter((id) => typeof id === 'number') : null;
 }
 
@@ -100,6 +111,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         session,
         username: usernameOf(session),
         favoriteLeagues: favoriteLeaguesOf(session),
+        favoriteTeams: favoriteTeamsOf(session),
         isLoading,
         isRecovering,
         finishRecovery: () => setIsRecovering(false),
