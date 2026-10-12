@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   SafeAreaView,
@@ -11,25 +11,69 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '../../supabase';
+import { getCurrentRound } from '../../utils/round-deadline';
+// The "איך זה עובד?" button is drawn inside the banner image, so we overlay a
+// transparent touch area on it. Coordinates are in the source image's pixels.
+const BANNER_IMAGE = { width: 1844, height: 853 };
+const HOW_IT_WORKS_BUTTON = { x: 185, y: 545, width: 480, height: 125 };
+
+// Maps the button's image rect to on-screen coordinates for resizeMode="cover".
+function howItWorksRect({ width, height }: { width: number; height: number }) {
+  const scale = Math.max(
+    width / BANNER_IMAGE.width,
+    height / BANNER_IMAGE.height
+  );
+  const offsetX = (width - BANNER_IMAGE.width * scale) / 2;
+  const offsetY = (height - BANNER_IMAGE.height * scale) / 2;
+  return {
+    left: offsetX + HOW_IT_WORKS_BUTTON.x * scale,
+    top: offsetY + HOW_IT_WORKS_BUTTON.y * scale,
+    width: HOW_IT_WORKS_BUTTON.width * scale,
+    height: HOW_IT_WORKS_BUTTON.height * scale,
+  };
+}
+
 export default function HomeScreen() {
  const [matches, setMatches] = useState<any[]>([]);
+ const [bannerSize, setBannerSize] = useState<{
+   width: number;
+   height: number;
+ } | null>(null);
+ const [now, setNow] = useState(() => Date.now());
+
+ useFocusEffect(
+  useCallback(() => {
+    const loadMatches = async () => {
+      const { data, error } = await supabase
+        .from('matches')
+        .select('round, kickoff_time, status')
+        .order('kickoff_time', { ascending: true });
+
+      if (error) {
+        console.log('Error loading matches:', error.message);
+        return;
+      }
+
+      setMatches(data ?? []);
+      setNow(Date.now());
+    };
+
+    loadMatches();
+  }, [])
+ );
+
+ const currentRound = useMemo(() => getCurrentRound(matches, now), [matches, now]);
+
+ // Flip to "closed" exactly when the round's deadline passes
  useEffect(() => {
-  const loadMatches = async () => {
-    const { data, error } = await supabase
-      .from('matches')
-      .select('*')
-      .order('kickoff_time', { ascending: true });
-
-    if (error) {
-      console.log('Error loading matches:', error.message);
-      return;
-    }
-
-    setMatches(data ?? []);
-  };
-
-  loadMatches();
-}, []);
+  if (!currentRound?.isOpen) return;
+  const timer = setTimeout(
+    () => setNow(Date.now()),
+    // Capped because setTimeout fires immediately on delays over ~24 days
+    Math.min(Math.max(currentRound.deadline - Date.now(), 0) + 1000, 60 * 60 * 1000)
+  );
+  return () => clearTimeout(timer);
+ }, [currentRound]);
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView
@@ -45,19 +89,36 @@ export default function HomeScreen() {
         </View>
 
         {/* BANNER */}
-        <View style={styles.bannerArea}>
+        <View
+          style={styles.bannerArea}
+          onLayout={(e) => setBannerSize(e.nativeEvent.layout)}
+        >
           <Image
             source={require('../../../assets/images/goalguess-banner-new.png')}
             style={styles.banner}
             resizeMode="cover"
           />
+          {bannerSize && (
+            <TouchableOpacity
+              style={[styles.howItWorks, howItWorksRect(bannerSize)]}
+              onPress={() => router.push('/rules')}
+              accessibilityRole="button"
+              accessibilityLabel="איך זה עובד?"
+            />
+          )}
         </View>
 
         {/* CURRENT ROUND */}
         <View style={styles.roundCard}>
           <View style={styles.roundTop}>
-            <Text style={styles.roundNumber}>מחזור 7</Text>
-            <Text style={styles.openText}>פתוח לניחושים</Text>
+            <Text style={styles.roundNumber}>
+              {currentRound ? `מחזור ${currentRound.round}` : ''}
+            </Text>
+            {currentRound && (
+              <Text style={currentRound.isOpen ? styles.openText : styles.closedText}>
+                {currentRound.isOpen ? 'פתוח לניחושים' : 'הניחושים סגורים'}
+              </Text>
+            )}
           </View>
 
           <Text style={styles.roundTitle}>המחזור הקרוב</Text>
@@ -81,10 +142,13 @@ export default function HomeScreen() {
             <Text style={styles.menuSub}>כל מה שחם</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuCard}>
-            <Text style={styles.menuIcon}>🏆</Text>
-            <Text style={styles.menuTitle}>טבלה</Text>
-            <Text style={styles.menuSub}>דירוג שחקנים</Text>
+          <TouchableOpacity
+            style={styles.menuCard}
+            onPress={() => router.push('/world-tables')}
+          >
+            <Text style={styles.menuIcon}>🌍</Text>
+            <Text style={styles.menuTitle}>טבלאות מהעולם</Text>
+            <Text style={styles.menuSub}>הליגות הבכירות</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -190,6 +254,11 @@ alignSelf: 'center',
     height: 145,
   },
 
+  howItWorks: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+
   roundCard: {
     backgroundColor: '#151515',
     borderRadius: 22,
@@ -211,6 +280,12 @@ alignSelf: 'center',
 
   openText: {
     color: 'limegreen',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  closedText: {
+    color: '#ff4d4d',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -272,6 +347,7 @@ alignSelf: 'center',
     color: 'white',
     fontSize: 15,
     fontWeight: '800',
+    textAlign: 'center',
   },
 
   menuSub: {

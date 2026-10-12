@@ -5,7 +5,7 @@ import { SessionProvider, useSession } from '../hooks/use-session';
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
-  const { session, username, isLoading, isRecovering } = useSession();
+  const { session, username, favoriteLeagues, isLoading, isRecovering } = useSession();
 
   if (isLoading) return null;
   SplashScreen.hide();
@@ -18,13 +18,20 @@ function RootNavigator() {
         <Stack.Screen name="reset-password" />
       </Stack.Protected>
 
-      <Stack.Protected guard={!isRecovering && !!session && !!username}>
+      <Stack.Protected guard={!isRecovering && !!session && !!username && !!favoriteLeagues}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="predictions" />
         <Stack.Screen name="match/[id]" />
         <Stack.Screen name="create-league" />
         <Stack.Screen name="league/[id]" />
         <Stack.Screen name="explore" />
+        <Stack.Screen name="world-tables" />
+        <Stack.Screen name="edit-leagues" />
+      </Stack.Protected>
+
+      {/* Has a username but hasn't picked leagues for the world tables yet */}
+      <Stack.Protected guard={!isRecovering && !!session && !!username && !favoriteLeagues}>
+        <Stack.Screen name="choose-leagues" />
       </Stack.Protected>
 
       {/* Signed in but no leaderboard name yet: new accounts land here after verifying */}

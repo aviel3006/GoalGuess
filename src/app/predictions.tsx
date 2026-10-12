@@ -13,6 +13,7 @@ import {
 
 import { LOGO_SIZE, TeamLogo } from '../components/team-logo';
 import { supabase } from '../supabase';
+import { getRoundDeadlines, isMatchOpen } from '../utils/round-deadline';
 
 type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled';
 
@@ -66,11 +67,6 @@ function formatTime(iso: string) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Mirrors check_prediction_deadline() in the database
-function isOpen(match: Match) {
-  return match.status === 'scheduled' && new Date(match.kickoff_time).getTime() > Date.now();
-}
-
 function sameScore(a: Score | undefined, b: Score | undefined) {
   return a?.home === b?.home && a?.away === b?.away;
 }
@@ -116,11 +112,12 @@ export default function PredictionsScreen() {
 
     setMatches(loadedMatches);
     setSaved(loadedSaved);
+    const loadedDeadlines = getRoundDeadlines(loadedMatches);
     setSelectedRound((current) => {
       if (current !== null && loadedMatches.some((m) => m.round === current)) return current;
       // Default to the round of the next match that can still be predicted
       return (
-        loadedMatches.find(isOpen)?.round ??
+        loadedMatches.find((m) => isMatchOpen(m, loadedDeadlines))?.round ??
         loadedMatches.reduce<number | null>((max, m) => Math.max(max ?? 0, m.round), null)
       );
     });
@@ -138,6 +135,9 @@ export default function PredictionsScreen() {
     [matches]
   );
 
+  const deadlines = useMemo(() => getRoundDeadlines(matches), [matches]);
+  const isOpen = useCallback((match: Match) => isMatchOpen(match, deadlines), [deadlines]);
+
   const roundMatches = useMemo(
     () => matches.filter((m) => m.round === selectedRound),
     [matches, selectedRound]
@@ -150,7 +150,7 @@ export default function PredictionsScreen() {
       matches
         .filter((m) => isOpen(m) && drafts[m.id] && !sameScore(drafts[m.id], saved[m.id]))
         .map((m) => ({ match: m, score: drafts[m.id] })),
-    [matches, drafts, saved]
+    [matches, drafts, saved, isOpen]
   );
 
   const dateRange = useMemo(() => {

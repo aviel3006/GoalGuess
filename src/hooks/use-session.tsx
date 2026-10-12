@@ -17,6 +17,8 @@ type SessionState = {
   session: Session | null;
   // The leaderboard name, stored in the auth user's metadata
   username: string | null;
+  // 365Scores competition ids picked on the choose-leagues screen; null until chosen
+  favoriteLeagues: number[] | null;
   isLoading: boolean;
   // Signed in from a password reset link and still has to choose a new password
   isRecovering: boolean;
@@ -26,6 +28,7 @@ type SessionState = {
 const SessionContext = createContext<SessionState>({
   session: null,
   username: null,
+  favoriteLeagues: null,
   isLoading: true,
   isRecovering: false,
   finishRecovery: () => {},
@@ -34,6 +37,11 @@ const SessionContext = createContext<SessionState>({
 function usernameOf(session: Session | null): string | null {
   const value = session?.user.user_metadata?.username;
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function favoriteLeaguesOf(session: Session | null): number[] | null {
+  const value = session?.user.user_metadata?.favorite_leagues;
+  return Array.isArray(value) ? value.filter((id) => typeof id === 'number') : null;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -91,6 +99,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       value={{
         session,
         username: usernameOf(session),
+        favoriteLeagues: favoriteLeaguesOf(session),
         isLoading,
         isRecovering,
         finishRecovery: () => setIsRecovering(false),
