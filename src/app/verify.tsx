@@ -1,49 +1,33 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
 import {
     ImageBackground,
     SafeAreaView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+
+import { authRedirectUrl } from '../hooks/use-session';
 import { supabase } from '../supabase';
 
 export default function VerifyScreen() {
   const { email } = useLocalSearchParams<{ email: string }>();
-  const [code, setCode] = useState('');
 
-  const verifyCode = async () => {
-    if (code.length !== 6) {
-      alert('יש להזין קוד בן 6 ספרות');
-      return;
-    }
-
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: code,
+  // Opening the link on this phone signs the user in; the root layout then shows the username screen
+  const resendLink = async () => {
+    const { error } = await supabase.auth.resend({
       type: 'signup',
+      email,
+      options: { emailRedirectTo: authRedirectUrl },
     });
 
     if (error) {
-      alert('קוד האימות שגוי או שפג תוקפו');
+      alert('לא הצלחנו לשלוח קישור חדש. נסה שוב מאוחר יותר.');
       return;
     }
 
-    // Verifying signs the user in; the root layout takes them to the username screen
-  };
-
-  const resendCode = async () => {
-    const { error } = await supabase.auth.resend({ type: 'signup', email });
-
-    if (error) {
-      alert('לא הצלחנו לשלוח קוד חדש. נסה שוב בעוד דקה.');
-      return;
-    }
-
-    alert('שלחנו קוד חדש לאימייל שלך');
+    alert('שלחנו קישור חדש לאימייל שלך');
   };
 
   return (
@@ -72,37 +56,29 @@ export default function VerifyScreen() {
           <Text style={styles.title}>Verify your email</Text>
 
           <Text style={styles.subtitle}>
-            Enter the 6-digit code we sent to
+            We sent a confirmation link to
           </Text>
 
           <Text style={styles.email}>{email}</Text>
 
-          <TextInput
-            style={styles.codeInput}
-            value={code}
-            onChangeText={(text) =>
-              setCode(text.replace(/[^0-9]/g, '').slice(0, 6))
-            }
-            keyboardType="number-pad"
-            maxLength={6}
-            placeholder="• • • • • •"
-            placeholderTextColor="#777"
-            textAlign="center"
-          />
+          <Text style={styles.instructions}>
+            שלחנו לך מייל עם קישור לאימות.{'\n'}
+            פתח את המייל בטלפון הזה ולחץ על הקישור, והאפליקציה תיפתח ותחבר אותך אוטומטית.
+          </Text>
 
           <TouchableOpacity
             style={styles.verifyButton}
-            onPress={verifyCode}
+            onPress={() => router.replace('/login')}
           >
-            <Text style={styles.verifyText}>Verify  →</Text>
+            <Text style={styles.verifyText}>Back to Log In  →</Text>
           </TouchableOpacity>
 
           <Text style={styles.helpText}>
-            {"Didn't receive the code?"}
+            {"Didn't receive the email?"}
           </Text>
 
-          <TouchableOpacity onPress={resendCode}>
-            <Text style={styles.resend}>Resend Code</Text>
+          <TouchableOpacity onPress={resendLink}>
+            <Text style={styles.resend}>Resend Link</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -185,18 +161,12 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
-  codeInput: {
-    width: '100%',
-    height: 75,
-    backgroundColor: 'rgba(8, 20, 17, 0.9)',
-    borderWidth: 1,
-    borderColor: '#46504d',
-    borderRadius: 18,
-    color: '#fff',
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: 12,
-    marginTop: 35,
+  instructions: {
+    color: '#e0e0e0',
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginTop: 30,
   },
 
   verifyButton: {

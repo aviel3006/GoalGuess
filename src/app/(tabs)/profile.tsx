@@ -77,7 +77,7 @@ export default function ProfileScreen() {
             Alert.alert('שגיאה', 'לא הצלחנו להתנתק. נסה שוב.');
             return;
           }
-          router.replace('/login');
+          // The root layout's guard sends signed-out users to login
         },
       },
     ]);

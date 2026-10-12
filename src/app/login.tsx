@@ -12,6 +12,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+
+import { authRedirectUrl } from '../hooks/use-session';
 import { supabase } from '../supabase';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -23,9 +25,13 @@ const handleLogin = async () => {
   });
 
   if (error) {
-    // Signed up but never entered the code: send a fresh one and finish verifying
+    // Signed up but never confirmed: send a fresh link and show the check-your-email screen
     if (error.code === 'email_not_confirmed') {
-      await supabase.auth.resend({ type: 'signup', email: email.trim() });
+      await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim(),
+        options: { emailRedirectTo: authRedirectUrl },
+      });
       router.push({ pathname: '/verify', params: { email: email.trim() } });
       return;
     }
@@ -87,7 +93,11 @@ const handleLogin = async () => {
             secureTextEntry
           />
 
-          <TouchableOpacity>
+          <TouchableOpacity
+            onPress={() =>
+              router.push({ pathname: '/forgot-password', params: { email: email.trim() } })
+            }
+          >
             <Text style={styles.forgot}>Forgot Password?</Text>
           </TouchableOpacity>
 

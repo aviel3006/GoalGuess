@@ -12,6 +12,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+
+import { authRedirectUrl } from '../hooks/use-session';
 import { supabase } from '../supabase';
 
 export default function SignupScreen() {
@@ -33,10 +35,17 @@ export default function SignupScreen() {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: { emailRedirectTo: authRedirectUrl },
     });
 
     if (error) {
       alert(error.message);
+      return;
+    }
+
+    // Supabase hides existing accounts by returning a user with no identities and sending no code
+    if (data.user?.identities?.length === 0) {
+      alert('האימייל הזה כבר רשום. התחבר במקום להירשם.');
       return;
     }
 
