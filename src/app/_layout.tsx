@@ -23,6 +23,7 @@ function RootNavigator() {
         <Stack.Screen name="predictions" />
         <Stack.Screen name="match/[id]" />
         <Stack.Screen name="create-league" />
+        <Stack.Screen name="league/[id]" />
         <Stack.Screen name="explore" />
       </Stack.Protected>
 

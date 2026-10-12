@@ -444,7 +444,7 @@ function LeagueRow({ league }: { league: ProfileLeague }) {
     <TouchableOpacity
       style={[styles.card, styles.leagueRow]}
       activeOpacity={0.8}
-      onPress={() => router.push({ pathname: '/leaderboard', params: { tab: 'friends' } })}
+      onPress={() => router.push({ pathname: '/league/[id]', params: { id: String(league.id) } })}
     >
       <View style={styles.leagueIcon}>
         {league.imageUrl ? (

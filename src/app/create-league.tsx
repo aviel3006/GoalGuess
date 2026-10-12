@@ -2,8 +2,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Image,
@@ -19,13 +20,30 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '../supabase';
+
+// Uploads into the public league-images bucket, under a folder named after the user's id
+async function uploadLeagueImage(userId: string, image: ImagePicker.ImagePickerAsset) {
+  const contentType = image.mimeType ?? 'image/jpeg';
+  const extension = (contentType.split('/')[1] ?? 'jpg').replace('jpeg', 'jpg');
+  const path = `${userId}/${Date.now()}.${extension}`;
+  const body = await fetch(image.uri).then((res) => res.arrayBuffer());
+
+  const { error } = await supabase.storage
+    .from('league-images')
+    .upload(path, body, { contentType });
+  if (error) throw error;
+
+  return supabase.storage.from('league-images').getPublicUrl(path).data.publicUrl;
+}
+
 export default function CreateLeagueScreen() {
   const [leagueName, setLeagueName] = useState('');
-const [leagueImage, setLeagueImage] = useState<string | null>(null);
+const [leagueImage, setLeagueImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 const [showNameError, setShowNameError] = useState(false);
 const [showSuccess, setShowSuccess] = useState(false);
 const [createdInviteCode, setCreatedInviteCode] = useState('');
-const confettiFall = useRef(new Animated.Value(0)).current;
+const [createdLeagueId, setCreatedLeagueId] = useState<number | null>(null);
+const [confettiFall] = useState(() => new Animated.Value(0));
 useEffect(() => {
   if (showSuccess) {
     confettiFall.setValue(0);
@@ -66,24 +84,32 @@ const createLeague = async () => {
       return;
     }
 
+    // Without a picked image the league falls back to the default picture
+    const imageUrl = leagueImage ? await uploadLeagueImage(user.id, leagueImage) : null;
+
+    const insertLeague = (code: string) =>
+      supabase
+        .from('leagues')
+        .insert({
+          name: leagueName.trim(),
+          created_by: user.id,
+          invite_code: code,
+          image_url: imageUrl,
+        })
+        .select('id')
+        .single();
+
     // Retry on the rare invite_code collision (unique violation)
     let inviteCode = generateInviteCode();
-    let { error } = await supabase.from('leagues').insert({
-      name: leagueName.trim(),
-      created_by: user.id,
-      invite_code: inviteCode,
-    });
+    let { data, error } = await insertLeague(inviteCode);
     for (let attempt = 0; error?.code === '23505' && attempt < 2; attempt++) {
       inviteCode = generateInviteCode();
-      ({ error } = await supabase.from('leagues').insert({
-        name: leagueName.trim(),
-        created_by: user.id,
-        invite_code: inviteCode,
-      }));
+      ({ data, error } = await insertLeague(inviteCode));
     }
 
     if (error) throw error;
 
+    setCreatedLeagueId(data?.id ?? null);
     setCreatedInviteCode(inviteCode);
     setShowSuccess(true);
   } catch (error) {
@@ -98,11 +124,11 @@ const pickImage = async () => {
     mediaTypes: ['images'],
     allowsEditing: true,
     aspect: [1, 1],
-    quality: 0.8,
+    quality: 0.6,
   });
 
   if (!result.canceled) {
-    setLeagueImage(result.assets[0].uri);
+    setLeagueImage(result.assets[0]);
   }
 };
   return (
@@ -134,7 +160,7 @@ const pickImage = async () => {
 >
           {leagueImage ? (
   <Image
-    source={{ uri: leagueImage }}
+    source={{ uri: leagueImage.uri }}
     style={{
       width: 170,
 height: 170,
@@ -163,11 +189,18 @@ borderRadius: 85,
         />
 
         <TouchableOpacity
-          style={styles.createButton}
+          style={[styles.createButton, isCreating && { opacity: 0.6 }]}
           onPress={createLeague}
+          disabled={isCreating}
         >
-          <Ionicons name="add-circle" size={23} color="#002710" />
-          <Text style={styles.createText}>צור את הליגה שלי</Text>
+          {isCreating ? (
+            <ActivityIndicator color="#002710" />
+          ) : (
+            <Ionicons name="add-circle" size={23} color="#002710" />
+          )}
+          <Text style={styles.createText}>
+            {isCreating ? 'יוצר את הליגה...' : 'צור את הליגה שלי'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
       <Modal
@@ -353,10 +386,11 @@ borderRadius: 85,
       <TouchableOpacity
         onPress={() => {
   setShowSuccess(false);
-  router.replace({
-    pathname: '/leaderboard',
-    params: { tab: 'friends' },
-  });
+  if (createdLeagueId !== null) {
+    router.replace({ pathname: '/league/[id]', params: { id: String(createdLeagueId) } });
+  } else {
+    router.replace({ pathname: '/leaderboard', params: { tab: 'friends' } });
+  }
 }}
         style={{
           backgroundColor: '#00E676',

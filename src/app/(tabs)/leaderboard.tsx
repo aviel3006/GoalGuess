@@ -334,7 +334,9 @@ const shareInvite = (league: { name: string; invite_code: string }) => {
 {myLeagues.map((league) => (
   <TouchableOpacity
     key={league.id}
-    onPress={() => shareInvite(league)}
+    onPress={() =>
+      router.push({ pathname: '/league/[id]', params: { id: String(league.id) } })
+    }
     style={{
       backgroundColor: '#102017',
       borderWidth: 1,
@@ -348,7 +350,11 @@ paddingHorizontal: 18,
     }}
   >
     <Image
-      source={require('../../../assets/images/default-league.png')}
+      source={
+        league.image_url
+          ? { uri: league.image_url }
+          : require('../../../assets/images/default-league.png')
+      }
       style={{
         width: 58,
         height: 58,
@@ -381,10 +387,10 @@ paddingHorizontal: 18,
   </Text>
 </View>
 
-    <View style={styles.inviteChip}>
+    <TouchableOpacity style={styles.inviteChip} onPress={() => shareInvite(league)} hitSlop={6}>
       <Ionicons name="share-social" size={14} color={GREEN} />
       <Text style={styles.inviteChipText}>{league.invite_code}</Text>
-    </View>
+    </TouchableOpacity>
   </TouchableOpacity>
 ))}
             {myLeagues.length === 0 && (
