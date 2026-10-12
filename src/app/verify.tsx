@@ -32,7 +32,18 @@ export default function VerifyScreen() {
       return;
     }
 
-    alert('האימייל אומת בהצלחה!');
+    // Verifying signs the user in; the root layout takes them to the username screen
+  };
+
+  const resendCode = async () => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+
+    if (error) {
+      alert('לא הצלחנו לשלוח קוד חדש. נסה שוב בעוד דקה.');
+      return;
+    }
+
+    alert('שלחנו קוד חדש לאימייל שלך');
   };
 
   return (
@@ -87,10 +98,10 @@ export default function VerifyScreen() {
           </TouchableOpacity>
 
           <Text style={styles.helpText}>
-            Didn't receive the code?
+            {"Didn't receive the code?"}
           </Text>
 
-          <TouchableOpacity>
+          <TouchableOpacity onPress={resendCode}>
             <Text style={styles.resend}>Resend Code</Text>
           </TouchableOpacity>
         </View>

@@ -30,7 +30,7 @@ export default function SignupScreen() {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     });
@@ -40,10 +40,14 @@ export default function SignupScreen() {
       return;
     }
 
-    router.replace({
-  pathname: '/username',
-  params: { email: email.trim() },
-});
+    // With email confirmation on there is no session yet; the root layout
+    // moves signed-in users to the username screen on its own
+    if (!data.session) {
+      router.replace({
+        pathname: '/verify',
+        params: { email: email.trim() },
+      });
+    }
   };
 
   return (

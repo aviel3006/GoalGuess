@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import {
+    ActivityIndicator,
     ImageBackground,
     KeyboardAvoidingView,
     Platform,
@@ -13,17 +13,33 @@ import {
     View,
 } from 'react-native';
 
+import { supabase } from '../supabase';
+
 export default function UsernameScreen() {
   const [username, setUsername] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const continueToApp = () => {
-    if (username.trim().length < 3) {
+  const continueToApp = async () => {
+    const name = username.trim().replace(/\s+/g, ' ');
+
+    if (name.length < 3) {
       alert('שם המשתמש חייב להכיל לפחות 3 תווים');
       return;
     }
 
-    // בהמשך נשמור את השם ב-Supabase
-    router.replace('/');
+    if (isSaving) return;
+
+    setIsSaving(true);
+    // Read by the leaderboard (get_global_leaderboard) and the profile screen
+    const { error } = await supabase.auth.updateUser({ data: { username: name } });
+    setIsSaving(false);
+
+    if (error) {
+      alert('לא הצלחנו לשמור את השם. נסה שוב.');
+      return;
+    }
+
+    // The root layout sees the new username and opens the app
   };
 
   return (
@@ -70,8 +86,13 @@ export default function UsernameScreen() {
           <TouchableOpacity
             style={styles.continueButton}
             onPress={continueToApp}
+            disabled={isSaving}
           >
-            <Text style={styles.continueText}>Continue →</Text>
+            {isSaving ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={styles.continueText}>Continue →</Text>
+            )}
           </TouchableOpacity>
 
           <Text style={styles.hint}>

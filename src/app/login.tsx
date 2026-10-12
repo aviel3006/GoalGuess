@@ -23,11 +23,17 @@ const handleLogin = async () => {
   });
 
   if (error) {
+    // Signed up but never entered the code: send a fresh one and finish verifying
+    if (error.code === 'email_not_confirmed') {
+      await supabase.auth.resend({ type: 'signup', email: email.trim() });
+      router.push({ pathname: '/verify', params: { email: email.trim() } });
+      return;
+    }
     alert(error.message);
     return;
   }
 
-  alert('התחברת בהצלחה!');
+  // The root layout redirects into the app once the session is set
 };
   return (
     <ImageBackground
@@ -101,7 +107,7 @@ const handleLogin = async () => {
           </TouchableOpacity>
 
           <View style={styles.signupRow}>
-            <Text style={styles.signupText}>Don't have an account? </Text>
+            <Text style={styles.signupText}>{"Don't have an account? "}</Text>
 
             <TouchableOpacity onPress={() => router.push('/signup')}>
               <Text style={styles.signupLink}>Sign Up</Text>
