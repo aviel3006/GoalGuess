@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { PlayerAvatar } from '../../components/player-avatar';
 import { supabase } from '../../supabase';
 const GREEN = '#00E676';
 
@@ -29,6 +30,7 @@ type LeaderboardEntry = {
   points: number;
   exact_count: number;
   is_me: boolean;
+  avatar_url: string | null;
 };
 
 const LEADERBOARD_SIZE = 50;
@@ -277,6 +279,7 @@ const shareInvite = (league: { name: string; invite_code: string }) => {
                   key={index}
                   rank={hasScores ? player.rank : null}
                   name={entryName(player)}
+                  avatarUrl={player.avatar_url}
                   exact={player.exact_count}
                   points={player.points}
                   highlighted={player.is_me}
@@ -291,6 +294,7 @@ const shareInvite = (league: { name: string; invite_code: string }) => {
                 <PlayerRow
                   rank={me.rank}
                   name={entryName(me)}
+                  avatarUrl={me.avatar_url}
                   exact={me.exact_count}
                   points={me.points}
                   highlighted
@@ -489,19 +493,15 @@ function PodiumPlayer({
         color={color}
       />
 
-      <View
+      <PlayerAvatar
+        uri={player.avatar_url}
+        size={first ? 54 : 44}
         style={[
           styles.podiumAvatar,
           { borderColor: color },
           first && styles.firstAvatar,
         ]}
-      >
-        <Ionicons
-          name="person"
-          size={first ? 33 : 27}
-          color="#E4EDE7"
-        />
-      </View>
+      />
 
       <Text style={[styles.podiumRank, { color }]}>
         {player.rank}
@@ -549,12 +549,14 @@ function TableHeader() {
 function PlayerRow({
   rank,
   name,
+  avatarUrl,
   exact,
   points,
   highlighted = false,
 }: {
   rank: number | null;
   name: string;
+  avatarUrl: string | null;
   exact: number;
   points: number;
   highlighted?: boolean;
@@ -571,9 +573,7 @@ function PlayerRow({
       </Text>
 
       <View style={[styles.rowNameWrap, styles.nameColumn]}>
-        <View style={styles.smallAvatar}>
-          <Ionicons name="person" size={16} color="#B8DCC3" />
-        </View>
+        <PlayerAvatar uri={avatarUrl} size={27} />
         <Text
           style={styles.rowName}
           numberOfLines={1}
@@ -718,19 +718,11 @@ paddingBottom: 12,
     borderColor: '#8A742B',
   },
   podiumAvatar: {
-    width: 44,
-height: 44,
-borderRadius: 22,
     borderWidth: 2,
     backgroundColor: '#20382A',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginTop: 12,
   },
   firstAvatar: {
-    width: 54,
-height: 54,
-borderRadius: 27,
     backgroundColor: '#3A3518',
   },
 
@@ -819,14 +811,6 @@ borderRadius: 27,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 7,
-  },
-  smallAvatar: {
-    width: 27,
-    height: 27,
-    borderRadius: 14,
-    backgroundColor: '#20432D',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   rowName: {
     color: '#FFFFFF',

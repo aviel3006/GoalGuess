@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PlayerAvatar } from '../../components/player-avatar';
 import { supabase } from '../../supabase';
 
 const GREEN = '#00E676';
@@ -38,6 +39,7 @@ type Standing = {
   exact_count: number;
   is_me: boolean;
   is_owner: boolean;
+  avatar_url: string | null;
 };
 
 type LoadState = 'loading' | 'error' | 'ready';
@@ -233,9 +235,7 @@ function StandingRow({ entry, showRank }: { entry: Standing; showRank: boolean }
       </View>
 
       <View style={[styles.rowNameWrap, styles.nameColumn]}>
-        <View style={styles.smallAvatar}>
-          <Ionicons name="person" size={16} color="#B8DCC3" />
-        </View>
+        <PlayerAvatar uri={entry.avatar_url} size={27} />
         <Text style={styles.rowName} numberOfLines={1}>
           {standingName(entry)}
         </Text>
@@ -436,14 +436,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 7,
-  },
-  smallAvatar: {
-    width: 27,
-    height: 27,
-    borderRadius: 14,
-    backgroundColor: '#20432D',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   rowName: {
     color: '#FFFFFF',
