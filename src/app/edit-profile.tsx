@@ -21,8 +21,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '../hooks/use-session';
+import { useUsernameAvailability } from '../hooks/use-username-availability';
 import { supabase } from '../supabase';
 import { COUNTRIES, countryName, flagEmoji, type Country } from '../utils/countries';
+import { claimUsername, cleanName, USERNAME_MAX, USERNAME_MIN } from '../utils/username';
 
 export { ScreenErrorBoundary as ErrorBoundary } from '../components/screen-error';
 
@@ -33,8 +35,6 @@ const CARD_BORDER = '#1B2620';
 const MUTED = '#8FA398';
 
 const AVATAR_BUCKET = 'avatars';
-const USERNAME_MIN = 3;
-const USERNAME_MAX = 20;
 const DISPLAY_NAME_MAX = 30;
 
 // What the avatar will be after saving: unchanged, a newly picked image, or removed
@@ -42,10 +42,6 @@ type AvatarChange =
   | { kind: 'keep' }
   | { kind: 'new'; image: ImagePicker.ImagePickerAsset }
   | { kind: 'remove' };
-
-function cleanName(value: string) {
-  return value.trim().replace(/\s+/g, ' ');
-}
 
 // Uploads into the public avatars bucket, under a folder named after the user's id.
 // Every upload gets a new file name so cached copies of the old picture never show.
@@ -89,8 +85,19 @@ export default function EditProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   const cleanUsername = cleanName(username);
+  const availability = useUsernameAvailability(username, initialUsername);
   const usernameError =
-    cleanUsername.length < USERNAME_MIN ? `שם המשתמש חייב להכיל לפחות ${USERNAME_MIN} תווים` : null;
+    cleanUsername.length < USERNAME_MIN
+      ? `שם המשתמש חייב להכיל לפחות ${USERNAME_MIN} תווים`
+      : availability === 'taken'
+        ? 'שם המשתמש הזה כבר תפוס'
+        : null;
+  const usernameHint =
+    availability === 'checking'
+      ? 'בודק אם השם פנוי…'
+      : availability === 'available'
+        ? 'השם פנוי ✓'
+        : 'השם שמופיע בטבלאות הדירוג';
 
   const hasChanges =
     cleanUsername !== initialUsername ||
@@ -150,11 +157,17 @@ export default function EditProfileScreen() {
 
     setIsSaving(true);
     try {
+      // Reserve a new name first, so a taken name doesn't cost an avatar upload
+      if (cleanUsername !== initialUsername && (await claimUsername(cleanUsername)) === 'taken') {
+        Alert.alert('השם תפוס', 'מישהו כבר בחר את שם המשתמש הזה. נסה שם אחר.');
+        return;
+      }
+
       let avatarUrl = currentAvatarUrl;
       if (avatar.kind === 'new') avatarUrl = await uploadAvatar(user.id, avatar.image);
       if (avatar.kind === 'remove') avatarUrl = null;
 
-      // Read by the profile screen; the leaderboards show the username
+      // Read by the profile screen; the leaderboards read the name from public.usernames
       const { error } = await supabase.auth.updateUser({
         data: {
           username: cleanUsername,
@@ -185,7 +198,7 @@ export default function EditProfileScreen() {
     }
   };
 
-  const canSave = hasChanges && !usernameError && !isSaving;
+  const canSave = hasChanges && !usernameError && availability !== 'checking' && !isSaving;
   const flag = country ? flagEmoji(country) : null;
 
   return (
@@ -240,7 +253,7 @@ export default function EditProfileScreen() {
 
           <Field
             label="שם משתמש"
-            hint="השם שמופיע בטבלאות הדירוג"
+            hint={usernameHint}
             error={usernameError}
           >
             <TextInput

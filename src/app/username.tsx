@@ -13,34 +13,54 @@ import {
     View,
 } from 'react-native';
 
+import { useUsernameAvailability } from '../hooks/use-username-availability';
 import { supabase } from '../supabase';
+import { claimUsername, cleanName, USERNAME_MAX, USERNAME_MIN } from '../utils/username';
 
 export default function UsernameScreen() {
   const [username, setUsername] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const availability = useUsernameAvailability(username);
 
   const continueToApp = async () => {
-    const name = username.trim().replace(/\s+/g, ' ');
+    const name = cleanName(username);
 
-    if (name.length < 3) {
-      alert('שם המשתמש חייב להכיל לפחות 3 תווים');
+    if (name.length < USERNAME_MIN) {
+      alert(`שם המשתמש חייב להכיל לפחות ${USERNAME_MIN} תווים`);
       return;
     }
 
     if (isSaving) return;
 
     setIsSaving(true);
-    // Read by the leaderboard (get_global_leaderboard) and the profile screen
-    const { error } = await supabase.auth.updateUser({ data: { username: name } });
-    setIsSaving(false);
+    try {
+      // The leaderboards read the name from public.usernames, which keeps it unique
+      if ((await claimUsername(name)) === 'taken') {
+        alert('מישהו כבר בחר את שם המשתמש הזה. נסה שם אחר.');
+        return;
+      }
 
-    if (error) {
+      // Read by the root layout's guards and the profile screen
+      const { error } = await supabase.auth.updateUser({ data: { username: name } });
+      if (error) throw error;
+
+      // The root layout sees the new username and opens the app
+    } catch (error) {
+      console.error('Save username error:', error);
       alert('לא הצלחנו לשמור את השם. נסה שוב.');
-      return;
+    } finally {
+      setIsSaving(false);
     }
-
-    // The root layout sees the new username and opens the app
   };
+
+  const hint =
+    availability === 'taken'
+      ? 'This nickname is already taken'
+      : availability === 'available'
+        ? 'Nickname available ✓'
+        : availability === 'checking'
+          ? 'Checking availability…'
+          : `You can use ${USERNAME_MIN}–${USERNAME_MAX} characters`;
 
   return (
     <ImageBackground
@@ -78,7 +98,7 @@ export default function UsernameScreen() {
             placeholderTextColor="#777"
             value={username}
             onChangeText={setUsername}
-            maxLength={20}
+            maxLength={USERNAME_MAX}
             autoCapitalize="none"
             textAlign="center"
           />
@@ -95,8 +115,8 @@ export default function UsernameScreen() {
             )}
           </TouchableOpacity>
 
-          <Text style={styles.hint}>
-            You can use 3–20 characters
+          <Text style={[styles.hint, availability === 'taken' && styles.hintTaken]}>
+            {hint}
           </Text>
         </View>
           </ScrollView>
@@ -194,5 +214,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     marginTop: 14,
+  },
+
+  hintTaken: {
+    color: '#FF6B6B',
   },
 });
