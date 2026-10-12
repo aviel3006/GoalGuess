@@ -34,6 +34,8 @@ export type ProfileStats = {
   totalPredictions: number;
   gradedPredictions: number;
   totalPoints: number;
+  // Graded predictions that earned points
+  correctPredictions: number;
   exactPredictions: number;
   // null when no prediction has been graded yet
   successRate: number | null;
@@ -242,6 +244,7 @@ async function loadProfile(): Promise<State> {
         totalPredictions: myPredictions.length,
         gradedPredictions: myGraded.length,
         totalPoints,
+        correctPredictions: successful,
         exactPredictions,
         successRate:
           myGraded.length > 0 ? Math.round((successful / myGraded.length) * 100) : null,

@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useProfile } from '../../hooks/use-profile';
 import { supabase } from '../../supabase';
 import { getCurrentRound } from '../../utils/round-deadline';
 // The "איך זה עובד?" button is drawn inside the banner image, so we overlay a
@@ -61,6 +62,15 @@ export default function HomeScreen() {
     loadMatches();
   }, [])
  );
+
+ const { state: profile, load: loadProfile } = useProfile();
+ useFocusEffect(
+  useCallback(() => {
+    loadProfile();
+  }, [loadProfile])
+ );
+ // Dashes while loading or on error, so a failed load never shows a fake 0
+ const stats = profile.status === 'ready' ? profile.data.stats : null;
 
  const currentRound = useMemo(() => getCurrentRound(matches, now), [matches, now]);
 
@@ -170,21 +180,27 @@ export default function HomeScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statNumber}>
+                {stats ? stats.totalPoints.toLocaleString() : '-'}
+              </Text>
               <Text style={styles.statLabel}>נקודות</Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>-</Text>
+              <Text style={styles.statNumber}>
+                {stats?.globalRank != null ? `#${stats.globalRank}` : '-'}
+              </Text>
               <Text style={styles.statLabel}>דירוג</Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>0</Text>
+              <Text style={styles.statNumber}>
+                {stats ? stats.correctPredictions.toLocaleString() : '-'}
+              </Text>
               <Text style={styles.statLabel}>ניחושים נכונים</Text>
             </View>
           </View>
