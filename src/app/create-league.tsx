@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -23,6 +24,7 @@ export default function CreateLeagueScreen() {
 const [leagueImage, setLeagueImage] = useState<string | null>(null);
 const [showNameError, setShowNameError] = useState(false);
 const [showSuccess, setShowSuccess] = useState(false);
+const [createdInviteCode, setCreatedInviteCode] = useState('');
 const confettiFall = useRef(new Animated.Value(0)).current;
 useEffect(() => {
   if (showSuccess) {
@@ -64,15 +66,26 @@ const createLeague = async () => {
       return;
     }
 
-    const { error } = await supabase.from('leagues').insert({
+    // Retry on the rare invite_code collision (unique violation)
+    let inviteCode = generateInviteCode();
+    let { error } = await supabase.from('leagues').insert({
       name: leagueName.trim(),
       created_by: user.id,
-      invite_code: generateInviteCode(),
+      invite_code: inviteCode,
     });
+    for (let attempt = 0; error?.code === '23505' && attempt < 2; attempt++) {
+      inviteCode = generateInviteCode();
+      ({ error } = await supabase.from('leagues').insert({
+        name: leagueName.trim(),
+        created_by: user.id,
+        invite_code: inviteCode,
+      }));
+    }
 
     if (error) throw error;
 
-    setShowSuccess(true);;
+    setCreatedInviteCode(inviteCode);
+    setShowSuccess(true);
   } catch (error) {
     console.error('Create league error:', error);
     Alert.alert('שגיאה', 'לא הצלחנו ליצור את הליגה. נסה שוב.');
@@ -309,6 +322,33 @@ borderRadius: 85,
       }}>
         🎉 הליגה שלך מוכנה! עכשיו אפשר להזמין חברים ולהתחיל להתחרות.
       </Text>
+
+      <Text style={{ color: '#AAB8AE', fontSize: 13 }}>קוד ההזמנה</Text>
+      <TouchableOpacity
+        onPress={() =>
+          Share.share({
+            message: `הצטרפו לליגה "${leagueName.trim()}" ב-GoalGuess עם הקוד: ${createdInviteCode}`,
+          })
+        }
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          marginTop: 8,
+          marginBottom: 22,
+          paddingVertical: 10,
+          paddingHorizontal: 18,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: '#24A53A',
+          backgroundColor: '#0B1810',
+        }}
+      >
+        <Text style={{ color: '#00E676', fontSize: 24, fontWeight: '900', letterSpacing: 4 }}>
+          {createdInviteCode}
+        </Text>
+        <Ionicons name="share-social" size={20} color="#00E676" />
+      </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => {

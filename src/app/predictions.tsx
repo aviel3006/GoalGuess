@@ -1,7 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,36 +11,153 @@ import {
   View
 } from 'react-native';
 
-type Game = {
+import { supabase } from '../supabase';
+
+type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled';
+
+type Match = {
   id: number;
-  home: string;
-  away: string;
-  homeLogo: string;
-  awayLogo: string;
-  date: string;
-  time: string;
-    homeScore?: number;
-  awayScore?: number;
+  round: number;
+  home_team: string;
+  away_team: string;
+  kickoff_time: string;
+  home_score: number | null;
+  away_score: number | null;
+  status: MatchStatus;
 };
 
-export default function PredictionsScreen() {
-    const [games, setGames] = useState<Game[]>([]);
+type Score = { home: number; away: number };
 
-    const [scores, setScores] = useState<
-  Record<number, { home: number; away: number }>
->({});
-const [showSaveMessage, setShowSaveMessage] = useState(false);
-const [selectedRound, setSelectedRound] = useState(7);
-  const changeScore = (
-    gameId: number,
-    side: 'home' | 'away',
-    amount: number
-  ) => {
-    setScores((current) => {
-      const score = current[gameId] || {
-        home: 0,
-        away: 0,
+type SavedPrediction = Score & {
+  // 0 until the match is finished and graded
+  points: number;
+};
+
+type PredictionRow = {
+  match_id: number;
+  predicted_home_score: number;
+  predicted_away_score: number;
+  points: number;
+};
+
+type LoadState = 'loading' | 'error' | 'ready';
+
+const STATUS_LABEL: Partial<Record<MatchStatus, string>> = {
+  live: 'חי',
+  postponed: 'נדחה',
+  cancelled: 'בוטל',
+};
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}`;
+}
+
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Mirrors check_prediction_deadline() in the database
+function isOpen(match: Match) {
+  return match.status === 'scheduled' && new Date(match.kickoff_time).getTime() > Date.now();
+}
+
+function sameScore(a: Score | undefined, b: Score | undefined) {
+  return a?.home === b?.home && a?.away === b?.away;
+}
+
+export default function PredictionsScreen() {
+  const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [saved, setSaved] = useState<Record<number, SavedPrediction>>({});
+  // Unsaved edits, kept across rounds until the user saves
+  const [drafts, setDrafts] = useState<Record<number, Score>>({});
+  const [selectedRound, setSelectedRound] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaveMessage, setShowSaveMessage] = useState(false);
+
+  const load = useCallback(async () => {
+    // RLS returns only the signed-in user's predictions
+    const [matchesRes, predictionsRes] = await Promise.all([
+      supabase
+        .from('matches')
+        .select('id, round, home_team, away_team, kickoff_time, home_score, away_score, status')
+        .order('kickoff_time'),
+      supabase
+        .from('predictions')
+        .select('match_id, predicted_home_score, predicted_away_score, points'),
+    ]);
+
+    const error = matchesRes.error ?? predictionsRes.error;
+    if (error) {
+      console.error('Load predictions error:', error);
+      setLoadState((current) => (current === 'ready' ? current : 'error'));
+      return;
+    }
+
+    const loadedMatches = (matchesRes.data ?? []) as Match[];
+    const loadedSaved: Record<number, SavedPrediction> = {};
+    for (const p of (predictionsRes.data ?? []) as PredictionRow[]) {
+      loadedSaved[p.match_id] = {
+        home: p.predicted_home_score,
+        away: p.predicted_away_score,
+        points: p.points,
       };
+    }
+
+    setMatches(loadedMatches);
+    setSaved(loadedSaved);
+    setSelectedRound((current) => {
+      if (current !== null && loadedMatches.some((m) => m.round === current)) return current;
+      // Default to the round of the next match that can still be predicted
+      return (
+        loadedMatches.find(isOpen)?.round ??
+        loadedMatches.reduce<number | null>((max, m) => Math.max(max ?? 0, m.round), null)
+      );
+    });
+    setLoadState('ready');
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const rounds = useMemo(
+    () => [...new Set(matches.map((m) => m.round))].sort((a, b) => b - a),
+    [matches]
+  );
+
+  const roundMatches = useMemo(
+    () => matches.filter((m) => m.round === selectedRound),
+    [matches, selectedRound]
+  );
+
+  const roundHasOpenMatches = roundMatches.some(isOpen);
+
+  const pendingRows = useMemo(
+    () =>
+      matches
+        .filter((m) => isOpen(m) && drafts[m.id] && !sameScore(drafts[m.id], saved[m.id]))
+        .map((m) => ({ match: m, score: drafts[m.id] })),
+    [matches, drafts, saved]
+  );
+
+  const dateRange = useMemo(() => {
+    if (roundMatches.length === 0) return '';
+    const first = formatDate(roundMatches[0].kickoff_time);
+    const last = formatDate(roundMatches[roundMatches.length - 1].kickoff_time);
+    return first === last ? first : `${first} - ${last}`;
+  }, [roundMatches]);
+
+  const changeScore = (gameId: number, side: 'home' | 'away', amount: number) => {
+    setDrafts((current) => {
+      const base = current[gameId] ?? saved[gameId] ?? { home: 0, away: 0 };
+      const score = { home: base.home, away: base.away };
 
       return {
         ...current,
@@ -51,131 +169,70 @@ const [selectedRound, setSelectedRound] = useState(7);
     });
   };
 
- const savePredictions = async () => {
-  try {
-    await AsyncStorage.setItem(`predictions_${selectedRound}`, JSON.stringify(scores));
-    setShowSaveMessage(true);
-setTimeout(() => setShowSaveMessage(false), 2000);
-  } catch (error) {
-    alert('הייתה בעיה בשמירת הניחושים');
-  }
-}; 
-useEffect(() => {
-  const loadPredictions = async () => {
-    try {
-     const saved = await AsyncStorage.getItem(`predictions_${selectedRound}`);
+  const savePredictions = async () => {
+    if (pendingRows.length === 0 || isSaving) return;
 
-      if (saved) {
-        setScores(JSON.parse(saved));
-        } else {
-  setScores({});
+    setIsSaving(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace('/login');
+        return;
       }
-    } catch (error) {
-      console.log('בעיה בטעינת הניחושים:', error);
-    }
-  };
 
-  loadPredictions();
-}, [selectedRound]);
-useEffect(() => {
-  console.log('KEY LOADED:', !!process.env.EXPO_PUBLIC_FOOTBALL_API_KEY);const loadGames = async () => {
-    try {
-      const response = await fetch(
-        'https://v3.football.api-sports.io/fixtures?league=383&season=2024',
-        {
-          headers: {
-            'x-apisports-key':
-              process.env.EXPO_PUBLIC_FOOTBALL_API_KEY || '',
-          },
-        }
+      const { error } = await supabase.from('predictions').upsert(
+        pendingRows.map(({ match, score }) => ({
+          user_id: user.id,
+          match_id: match.id,
+          predicted_home_score: score.home,
+          predicted_away_score: score.away,
+        })),
+        { onConflict: 'user_id,match_id' }
       );
 
-      const data = await response.json();
+      if (error) {
+        // Raised by the deadline trigger when a match kicked off while the screen was open
+        if (error.message.includes('Predictions are closed')) {
+          Alert.alert('המשחק כבר התחיל', 'אחד המשחקים כבר התחיל ולא ניתן לשנות את הניחוש שלו.');
+          load();
+          return;
+        }
+        throw error;
+      }
 
-      console.log('API RESPONSE:', data);
+      const savedIds = new Set(pendingRows.map(({ match }) => match.id));
+      setSaved((current) => {
+        const next = { ...current };
+        for (const { match, score } of pendingRows) {
+          next[match.id] = { ...score, points: 0 };
+        }
+        return next;
+      });
+      setDrafts((current) =>
+        Object.fromEntries(Object.entries(current).filter(([id]) => !savedIds.has(Number(id))))
+      );
+
+      setShowSaveMessage(true);
+      setTimeout(() => setShowSaveMessage(false), 2000);
     } catch (error) {
-      console.log('API ERROR:', error);
+      console.error('Save predictions error:', error);
+      Alert.alert('שגיאה', 'הייתה בעיה בשמירת הניחושים. נסה שוב.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  loadGames();
-}, []);
-useEffect(() => {
-  if (selectedRound === 7) {
-    setGames([
-      {
-        id: 701,
-        home: 'מכבי חיפה',
-        away: 'מכבי תל אביב',
-        homeLogo: '',
-        awayLogo: '',
-        date: '12.10',
-        time: '20:00',
-      },
-      {
-        id: 702,
-        home: 'הפועל באר שבע',
-        away: 'בית"ר ירושלים',
-        homeLogo: '',
-        awayLogo: '',
-        date: '12.10',
-        time: '20:30',
-      },
-      {
-        id: 703,
-        home: 'הפועל תל אביב',
-        away: 'מכבי נתניה',
-        homeLogo: '',
-        awayLogo: '',
-        date: '13.10',
-        time: '20:15',
-      },
-    ]);
-    } else if (selectedRound === 6) {
-    setGames([
-      {
-        id: 601,
-        home: 'בית"ר ירושלים',
-        away: 'מכבי חיפה',
-        homeLogo: '',
-        awayLogo: '',
-        date: '05.10',
-        time: '20:00',
-homeScore: 2,
-awayScore: 1,
-
-      },
-      {
-        id: 602,
-        home: 'מכבי תל אביב',
-        away: 'הפועל תל אביב',
-        homeLogo: '',
-        awayLogo: '',
-        date: '05.10',
-        time: '20:30',
-      },
-      {
-        id: 603,
-        home: 'מכבי נתניה',
-        away: 'הפועל באר שבע',
-        homeLogo: '',
-        awayLogo: '',
-        date: '06.10',
-        time: '20:15',
-      },
-    ]);
-  } else {
-  setGames([]);
-}
-}, [selectedRound]);
   return (
     <SafeAreaView style={styles.screen}>
       {showSaveMessage && (
-  <View style={styles.saveToast}>
-    <Text style={styles.saveToastCheck}>✓</Text>
-    <Text style={styles.saveToastText}>השינויים נשמרו בהצלחה!</Text>
-  </View>
-)}
+        <View style={styles.saveToast}>
+          <Text style={styles.saveToastCheck}>✓</Text>
+          <Text style={styles.saveToastText}>השינויים נשמרו בהצלחה!</Text>
+        </View>
+      )}
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -193,139 +250,185 @@ awayScore: 1,
           <View style={styles.headerSpace} />
         </View>
 
-        <ScrollView
-  horizontal
-  showsHorizontalScrollIndicator={false}
-  contentContainerStyle={styles.roundTabs}
->
-  {[7, 6, 5, 4, 3, 2, 1].map((round) => (
-    <TouchableOpacity
-      key={round}
-      style={selectedRound === round ? styles.activeRound : styles.round}
-      onPress={() => setSelectedRound(round)}
-    >
-      <Text
-        style={
-          selectedRound === round
-            ? styles.activeRoundText
-            : styles.roundText
-        }
-      >
-        מחזור {round}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</ScrollView>
-
-        <Text style={styles.dateTitle}>
-  {selectedRound === 7 ? '12.10 - 14.10' : selectedRound === 6 ? '05.10 - 06.10' : ''}
-</Text>
-{selectedRound === 7 && (
-        <Text style={styles.instructions}>
-          בחרו תוצאה לכל משחק ולחצו שמור ניחושים
-        </Text>
+        {loadState === 'loading' && (
+          <ActivityIndicator size="large" color="limegreen" style={styles.loader} />
         )}
-{games.length === 0 && (
-  <Text style={styles.instructions}>
-    אין משחקים במחזור הזה כרגע
-  </Text>
-)}
-        {games.map((game) => {
-          const score = scores[game.id] || {
-            home: 0,
-            away: 0,
-          };
 
-          return (
-            <View key={game.id} style={styles.gameCard}>
-              <Text style={styles.gameDate}>
-                {game.date} | {game.time}
-              </Text>
+        {loadState === 'error' && (
+          <View style={styles.emptyState}>
+            <Text style={styles.instructions}>לא הצלחנו לטעון את המשחקים</Text>
+            <TouchableOpacity onPress={load}>
+              <Text style={styles.retryText}>נסה שוב</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-              <View style={styles.matchRow}>
-                <View style={styles.team}>
-                  <View style={styles.logoCircle}>
-                    <Text style={styles.ball}>⚽</Text>
-                  </View>
-
-                  <Text style={styles.teamName}>
-                    {game.home}
-                  </Text>
-                </View>
-
-                {selectedRound < 7 &&
-game.homeScore !== undefined &&
-game.awayScore !== undefined ? (
-  <View style={styles.scoreSection}>
-    <Text style={styles.score}>{game.homeScore}</Text>
-    <Text style={styles.colon}>:</Text>
-    <Text style={styles.score}>{game.awayScore}</Text>
-  </View>
-) : (
-  <View style={styles.scoreSection}>
-    <View style={styles.scoreBox}>
-      <TouchableOpacity
-        style={styles.scoreButton}
-        onPress={() => changeScore(game.id, 'home', 1)}
-      >
-        <Text style={styles.plus}>+</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.score}>{score.home}</Text>
-
-      <TouchableOpacity
-        style={styles.scoreButton}
-        onPress={() => changeScore(game.id, 'home', -1)}
-      >
-        <Text style={styles.minus}>−</Text>
-      </TouchableOpacity>
-    </View>
-
-    <Text style={styles.colon}>:</Text>
-
-    <View style={styles.scoreBox}>
-      <TouchableOpacity
-        style={styles.scoreButton}
-        onPress={() => changeScore(game.id, 'away', 1)}
-      >
-        <Text style={styles.plus}>+</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.score}>{score.away}</Text>
-
-      <TouchableOpacity
-        style={styles.scoreButton}
-        onPress={() => changeScore(game.id, 'away', -1)}
-      >
-        <Text style={styles.minus}>−</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-)}
-
-                <View style={styles.team}>
-                  <View style={styles.logoCircle}>
-                    <Text style={styles.ball}>⚽</Text>
-                  </View>
-
-                  <Text style={styles.teamName}>
-                    {game.away}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          );
-        })}
-{selectedRound === 7 && (
-        <TouchableOpacity style={styles.saveButton} onPress={savePredictions}>
-          <Text style={styles.saveText}>
-            שמור ניחושים
+        {loadState === 'ready' && rounds.length === 0 && (
+          <Text style={[styles.instructions, styles.emptyState]}>
+            עדיין אין משחקים זמינים לניחוש
           </Text>
-        </TouchableOpacity>
-)}
-        <Text style={styles.bottomText}>
-          ניתן לשנות את הניחושים עד תחילת המשחק
-        </Text>
+        )}
+
+        {loadState === 'ready' && rounds.length > 0 && (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.roundTabs}
+            >
+              {rounds.map((round) => (
+                <TouchableOpacity
+                  key={round}
+                  style={selectedRound === round ? styles.activeRound : styles.round}
+                  onPress={() => setSelectedRound(round)}
+                >
+                  <Text
+                    style={
+                      selectedRound === round
+                        ? styles.activeRoundText
+                        : styles.roundText
+                    }
+                  >
+                    מחזור {round}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.dateTitle}>{dateRange}</Text>
+            {roundHasOpenMatches && (
+              <Text style={styles.instructions}>
+                בחרו תוצאה לכל משחק ולחצו שמור ניחושים
+              </Text>
+            )}
+
+            {roundMatches.map((game) => {
+              const open = isOpen(game);
+              const mine = saved[game.id];
+              const score = drafts[game.id] ?? mine;
+              const statusLabel = STATUS_LABEL[game.status];
+              const isFinished =
+                game.status === 'finished' &&
+                game.home_score !== null &&
+                game.away_score !== null;
+
+              return (
+                <View key={game.id} style={styles.gameCard}>
+                  <Text style={styles.gameDate}>
+                    {formatDate(game.kickoff_time)} | {formatTime(game.kickoff_time)}
+                    {statusLabel ? ` | ${statusLabel}` : ''}
+                  </Text>
+
+                  <View style={styles.matchRow}>
+                    <View style={styles.team}>
+                      <View style={styles.logoCircle}>
+                        <Text style={styles.ball}>⚽</Text>
+                      </View>
+
+                      <Text style={styles.teamName}>
+                        {game.home_team}
+                      </Text>
+                    </View>
+
+                    {open ? (
+                      <View style={styles.scoreSection}>
+                        <View style={styles.scoreBox}>
+                          <TouchableOpacity
+                            style={styles.scoreButton}
+                            onPress={() => changeScore(game.id, 'home', 1)}
+                          >
+                            <Text style={styles.plus}>+</Text>
+                          </TouchableOpacity>
+
+                          <Text style={styles.score}>{score ? score.home : '–'}</Text>
+
+                          <TouchableOpacity
+                            style={styles.scoreButton}
+                            onPress={() => changeScore(game.id, 'home', -1)}
+                          >
+                            <Text style={styles.minus}>−</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.colon}>:</Text>
+
+                        <View style={styles.scoreBox}>
+                          <TouchableOpacity
+                            style={styles.scoreButton}
+                            onPress={() => changeScore(game.id, 'away', 1)}
+                          >
+                            <Text style={styles.plus}>+</Text>
+                          </TouchableOpacity>
+
+                          <Text style={styles.score}>{score ? score.away : '–'}</Text>
+
+                          <TouchableOpacity
+                            style={styles.scoreButton}
+                            onPress={() => changeScore(game.id, 'away', -1)}
+                          >
+                            <Text style={styles.minus}>−</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={styles.scoreSection}>
+                        {isFinished ? (
+                          <>
+                            <Text style={styles.score}>{game.home_score}</Text>
+                            <Text style={styles.colon}>:</Text>
+                            <Text style={styles.score}>{game.away_score}</Text>
+                          </>
+                        ) : (
+                          <Text style={styles.lockedText}>🔒 נעול</Text>
+                        )}
+                      </View>
+                    )}
+
+                    <View style={styles.team}>
+                      <View style={styles.logoCircle}>
+                        <Text style={styles.ball}>⚽</Text>
+                      </View>
+
+                      <Text style={styles.teamName}>
+                        {game.away_team}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {!open && (
+                    <Text style={styles.myPrediction}>
+                      {mine ? `הניחוש שלך: ${mine.home}:${mine.away}` : 'לא ניחשת את המשחק הזה'}
+                      {mine && isFinished && (
+                        <Text style={mine.points > 0 ? styles.pointsEarned : styles.pointsNone}>
+                          {'  '}+{mine.points} נק׳
+                        </Text>
+                      )}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+
+            {roundHasOpenMatches && (
+              <TouchableOpacity
+                style={[styles.saveButton, pendingRows.length === 0 && styles.saveButtonDisabled]}
+                onPress={savePredictions}
+                disabled={pendingRows.length === 0 || isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="black" />
+                ) : (
+                  <Text style={styles.saveText}>
+                    שמור ניחושים
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+            <Text style={styles.bottomText}>
+              ניתן לשנות את הניחושים עד תחילת המשחק
+            </Text>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -555,5 +658,48 @@ scoreButton: {
     fontSize: 11,
     textAlign: 'center',
     marginTop: 12,
+  },
+
+  saveButtonDisabled: {
+    opacity: 0.45,
+  },
+
+  loader: {
+    marginTop: 60,
+  },
+
+  emptyState: {
+    marginTop: 60,
+    alignItems: 'center',
+  },
+
+  retryText: {
+    color: 'limegreen',
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+
+  lockedText: {
+    color: 'gray',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  myPrediction: {
+    color: 'gray',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 14,
+  },
+
+  pointsEarned: {
+    color: 'limegreen',
+    fontWeight: '900',
+  },
+
+  pointsNone: {
+    color: '#8A8A8A',
+    fontWeight: '900',
   },
 });

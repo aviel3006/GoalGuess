@@ -1,39 +1,42 @@
 
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   ImageBackground,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { supabase } from '../../supabase';
 const GREEN = '#00E676';
 
-const players = [
-  { name: 'Player_7', points: 1250, exact: 24 },
-  { name: 'GoalMaster', points: 1180, exact: 21 },
-  { name: 'FootballKing', points: 1040, exact: 19 },
-  { name: 'Striker10', points: 890, exact: 15 },
-  { name: 'ThePredictor', points: 760, exact: 12 },
-  { name: 'FootyFan', points: 680, exact: 11 },
-  { name: 'MatchWizard', points: 640, exact: 10 },
-  { name: 'KingKicks', points: 590, exact: 9 },
-  { name: 'GoalHunter', points: 560, exact: 9 },
-  { name: 'PredictPro', points: 520, exact: 8 },
-];
-
-const myPlayer = {
-  name: 'אתה',
-  rank: 23,
-  points: 320,
-  exact: 5,
+// Returned by the get_global_leaderboard() database function
+type LeaderboardEntry = {
+  rank: number;
+  display_name: string | null;
+  points: number;
+  exact_count: number;
+  is_me: boolean;
 };
+
+const LEADERBOARD_SIZE = 50;
+
+function entryName(entry: LeaderboardEntry) {
+  if (entry.is_me) return 'אתה';
+  return entry.display_name ?? 'שחקן';
+}
 
 export default function LeaderboardScreen() {
   const { tab: initialTab } = useLocalSearchParams<{ tab?: string }>();
@@ -45,19 +48,39 @@ const [myLeagues, setMyLeagues] = useState<
     id: number;
     name: string;
     image_url: string | null;
+    invite_code: string;
     member_count: number;
   }[]
 >([]);
-useEffect(() => {
-  const loadLeagues = async () => {
+const [joinVisible, setJoinVisible] = useState(false);
+const [joinCode, setJoinCode] = useState('');
+const [isJoining, setIsJoining] = useState(false);
+const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+
+  const loadLeaderboard = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_global_leaderboard', {
+      p_limit: LEADERBOARD_SIZE,
+    });
+
+    if (error) {
+      console.error('Load leaderboard error:', error);
+      setLeaderboard((current) => current ?? []);
+      return;
+    }
+
+    setLeaderboard((data ?? []) as LeaderboardEntry[]);
+  }, []);
+
+  const loadLeagues = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) return;
 
+    // RLS returns only leagues the user created or joined
     const { data, error } = await supabase
       .from('leagues')
-      .select('id, name, image_url')
-      .eq('created_by', user.id);
+      .select('id, name, image_url, invite_code')
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Load leagues error:', error);
@@ -83,10 +106,63 @@ useEffect(() => {
 );
 
 setMyLeagues(leaguesWithCounts);
-  };
+  }, []);
 
-  loadLeagues();
-}, []);
+useFocusEffect(
+  useCallback(() => {
+    loadLeagues();
+    loadLeaderboard();
+  }, [loadLeagues, loadLeaderboard])
+);
+
+const closeJoin = () => {
+  setJoinVisible(false);
+  setJoinCode('');
+};
+
+const joinLeague = async () => {
+  const code = joinCode.trim();
+  if (!code || isJoining) return;
+
+  setIsJoining(true);
+  try {
+    const { data, error } = await supabase.rpc('join_league', { p_invite_code: code });
+
+    if (error) {
+      if (error.message.includes('invalid_invite_code')) {
+        Alert.alert('קוד שגוי', 'לא מצאנו ליגה עם הקוד הזה. בדוק אותו ונסה שוב.');
+      } else {
+        throw error;
+      }
+      return;
+    }
+
+    const joined = (data as { league_name: string; already_member: boolean }[])[0];
+    closeJoin();
+    Alert.alert(
+      joined.already_member ? 'כבר בליגה' : 'הצטרפת לליגה!',
+      joined.already_member
+        ? `אתה כבר חבר בליגה "${joined.league_name}"`
+        : `ברוך הבא לליגה "${joined.league_name}" 🎉`
+    );
+    loadLeagues();
+  } catch (error) {
+    console.error('Join league error:', error);
+    Alert.alert('שגיאה', 'לא הצלחנו להצטרף לליגה. נסה שוב.');
+  } finally {
+    setIsJoining(false);
+  }
+};
+
+// The RPC appends the caller's own row when they are outside the top
+const topPlayers = (leaderboard ?? []).slice(0, LEADERBOARD_SIZE);
+const me = leaderboard?.find((entry) => entry.is_me) ?? null;
+
+const shareInvite = (league: { name: string; invite_code: string }) => {
+  Share.share({
+    message: `הצטרפו לליגה "${league.name}" ב-GoalGuess עם הקוד: ${league.invite_code}`,
+  });
+};
   return (
     <ImageBackground
   source={require('../../../assets/images/stadium.png')}
@@ -152,52 +228,70 @@ setMyLeagues(leaguesWithCounts);
         </View>
 
         {tab === 'global' ? (
+          leaderboard === null ? (
+            <ActivityIndicator size="large" color={GREEN} style={styles.loader} />
+          ) : topPlayers.length === 0 ? (
+            <View style={styles.emptyLeague}>
+              <Ionicons name="podium-outline" size={58} color="#42624D" />
+              <Text style={styles.emptyTitle}>הטבלה עדיין ריקה</Text>
+              <Text style={styles.emptySubtitle}>
+                הניקוד יופיע כאן אחרי שהמשחקים הראשונים יסתיימו
+              </Text>
+            </View>
+          ) : (
           <>
             <View style={styles.podium}>
               <PodiumPlayer
-                player={players[1]}
-                rank={2}
+                player={topPlayers[1]}
                 color="#C0C0C0"
               />
               <PodiumPlayer
-                player={players[0]}
-                rank={1}
+                player={topPlayers[0]}
                 color="#FFD54F"
                 first
               />
               <PodiumPlayer
-                player={players[2]}
-                rank={3}
+                player={topPlayers[2]}
                 color="#CD8B52"
               />
             </View>
 
+            {topPlayers.length > 3 && (
             <View style={styles.table}>
               <TableHeader />
 
-              {players.slice(3).map((player, index) => (
+              {topPlayers.slice(3).map((player, index) => (
                 <PlayerRow
-                  key={player.name}
-                  rank={index + 4}
-                  name={player.name}
-                  exact={player.exact}
+                  key={index}
+                  rank={player.rank}
+                  name={entryName(player)}
+                  exact={player.exact_count}
                   points={player.points}
+                  highlighted={player.is_me}
                 />
               ))}
             </View>
+            )}
 
             <Text style={styles.myTitle}>הדירוג שלי</Text>
 
+            {me ? (
             <View style={styles.myCard}>
               <PlayerRow
-                rank={myPlayer.rank}
-                name={myPlayer.name}
-                exact={myPlayer.exact}
-                points={myPlayer.points}
+                rank={me.rank}
+                name={entryName(me)}
+                exact={me.exact_count}
+                points={me.points}
                 highlighted
               />
             </View>
+            ) : (
+              <Text style={styles.myEmpty}>
+                עדיין אין לך ניקוד — נחש משחקים כדי להיכנס לטבלה
+              </Text>
+            )}
           </>
+          )
         ) : (
           <>
             <Text style={styles.friendsDescription}>
@@ -218,7 +312,7 @@ setMyLeagues(leaguesWithCounts);
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.joinButton}>
+            <TouchableOpacity style={styles.joinButton} onPress={() => setJoinVisible(true)}>
               <Ionicons
                 name="enter-outline"
                 size={22}
@@ -232,6 +326,7 @@ setMyLeagues(leaguesWithCounts);
 {myLeagues.map((league) => (
   <TouchableOpacity
     key={league.id}
+    onPress={() => shareInvite(league)}
     style={{
       backgroundColor: '#102017',
       borderWidth: 1,
@@ -277,8 +372,14 @@ paddingHorizontal: 18,
     👥 {league.member_count} {league.member_count === 1 ? 'משתתף' : 'משתתפים'}
   </Text>
 </View>
+
+    <View style={styles.inviteChip}>
+      <Ionicons name="share-social" size={14} color={GREEN} />
+      <Text style={styles.inviteChipText}>{league.invite_code}</Text>
+    </View>
   </TouchableOpacity>
 ))}
+            {myLeagues.length === 0 && (
             <View style={styles.emptyLeague}>
               <Ionicons
                 name="trophy-outline"
@@ -292,9 +393,58 @@ paddingHorizontal: 18,
                 צור ליגה, הזמן חברים והתחילו להתחרות
               </Text>
             </View>
+            )}
           </>
         )}
       </ScrollView>
+
+      <Modal
+        visible={joinVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeJoin}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalCard}>
+            <Ionicons name="enter-outline" size={44} color={GREEN} />
+            <Text style={styles.modalTitle}>הצטרפות לליגה</Text>
+            <Text style={styles.modalSubtitle}>הזן את קוד ההזמנה שקיבלת מחבר</Text>
+
+            <TextInput
+              value={joinCode}
+              onChangeText={(text) => setJoinCode(text.toUpperCase())}
+              placeholder="ABCD1234"
+              placeholderTextColor="#4F6B5A"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoFocus
+              maxLength={12}
+              returnKeyType="done"
+              onSubmitEditing={joinLeague}
+              style={styles.codeInput}
+            />
+
+            <TouchableOpacity
+              style={[styles.createButton, styles.modalButton, !joinCode.trim() && styles.disabled]}
+              onPress={joinLeague}
+              disabled={!joinCode.trim() || isJoining}
+            >
+              {isJoining ? (
+                <ActivityIndicator color="#002710" />
+              ) : (
+                <Text style={styles.createButtonText}>הצטרף</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={closeJoin} hitSlop={10}>
+              <Text style={styles.modalCancel}>ביטול</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       
     </ImageBackground>
@@ -303,15 +453,18 @@ paddingHorizontal: 18,
 
 function PodiumPlayer({
   player,
-  rank,
   color,
   first = false,
 }: {
-  player: { name: string; points: number; exact: number };
-  rank: number;
+  // undefined while fewer than three players have scored
+  player: LeaderboardEntry | undefined;
   color: string;
   first?: boolean;
 }) {
+  if (!player) {
+    return <View style={[styles.podiumPlayer, styles.podiumEmpty, first && styles.firstPlayer]} />;
+  }
+
   return (
     
 <View style={[styles.podiumPlayer, first && styles.firstPlayer]}>
@@ -337,14 +490,14 @@ function PodiumPlayer({
       </View>
 
       <Text style={[styles.podiumRank, { color }]}>
-        {rank}
+        {player.rank}
       </Text>
 
       <Text
         style={styles.podiumName}
         numberOfLines={1}
       >
-        {player.name}
+        {entryName(player)}
       </Text>
 
       <Text style={styles.podiumPoints}>
@@ -354,7 +507,7 @@ function PodiumPlayer({
       <Text style={styles.podiumLabel}>ניקוד</Text>
 
       <Text style={styles.podiumExact}>
-        {player.exact} דיוקים
+        {player.exact_count} דיוקים
       </Text>
     </View>
   );
@@ -687,6 +840,18 @@ borderRadius: 27,
     marginTop: 27,
     marginBottom: 12,
   },
+  myEmpty: {
+    color: '#879B8C',
+    fontSize: 13,
+    textAlign: 'right',
+  },
+  loader: {
+    marginTop: 40,
+  },
+  podiumEmpty: {
+    alignSelf: 'stretch',
+    opacity: 0.35,
+  },
   myCard: {
     borderRadius: 13,
     overflow: 'hidden',
@@ -726,6 +891,77 @@ borderRadius: 27,
     color: GREEN,
     fontSize: 16,
     fontWeight: '800',
+  },
+  inviteChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#245A3A',
+    marginRight: 10,
+  },
+  inviteChipText: {
+    color: GREEN,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+  },
+  modalCard: {
+    backgroundColor: '#102017',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#24A53A',
+    padding: 26,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    marginTop: 10,
+  },
+  modalSubtitle: {
+    color: '#AAB8AE',
+    fontSize: 14,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  codeInput: {
+    width: '100%',
+    marginTop: 20,
+    backgroundColor: '#0B1810',
+    borderWidth: 1,
+    borderColor: '#245A3A',
+    borderRadius: 14,
+    paddingVertical: 14,
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 4,
+    textAlign: 'center',
+  },
+  modalButton: {
+    width: '100%',
+    marginTop: 16,
+    paddingVertical: 15,
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  modalCancel: {
+    color: '#8FA99A',
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 16,
   },
   emptyLeague: {
     marginTop: 50,
