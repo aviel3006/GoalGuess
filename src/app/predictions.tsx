@@ -437,7 +437,7 @@ function TeamLogo({ badge }: { badge: string | null }) {
   return (
     <View style={styles.logoCircle}>
       {badge ? (
-        // TheSportsDB serves a 250px version at /small, plenty for a 48px circle
+        // TheSportsDB serves a 250px version at /small, plenty for a 54px circle
         <Image
           source={{ uri: `${badge}/small` }}
           style={styles.badge}
@@ -592,9 +592,9 @@ saveToastText: {
   },
 
   logoCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: '#252525',
     alignItems: 'center',
     justifyContent: 'center',
@@ -605,8 +605,8 @@ saveToastText: {
   },
 
   badge: {
-    width: 34,
-    height: 34,
+    width: 42,
+    height: 42,
   },
 
   teamName: {
