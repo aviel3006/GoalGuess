@@ -38,6 +38,8 @@ function RootNavigator() {
         <Stack.Screen name="edit-teams" />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="my-stats" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="change-password" />
       </Stack.Protected>
 
       {/* Has a username but hasn't picked leagues for the world tables yet */}

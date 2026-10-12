@@ -3,7 +3,6 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   RefreshControl,
   ScrollView,
@@ -22,8 +21,8 @@ import {
   type ProfileData,
   type ProfileLeague,
 } from '../../hooks/use-profile';
-import { supabase } from '../../supabase';
 import { flagEmoji } from '../../utils/countries';
+import { confirmSignOut } from '../../utils/sign-out';
 
 const GREEN = '#00E676';
 const GOLD = '#F5C542';
@@ -54,8 +53,8 @@ function openMyStats() {
   router.push('/my-stats');
 }
 
-function comingSoon() {
-  Alert.alert('בקרוב', 'המסך הזה עדיין בפיתוח');
+function openSettings() {
+  router.push('/settings');
 }
 
 export default function ProfileScreen() {
@@ -67,24 +66,6 @@ export default function ProfileScreen() {
       load();
     }, [load])
   );
-
-  const confirmLogout = () => {
-    Alert.alert('התנתקות', 'בטוח שברצונך להתנתק?', [
-      { text: 'ביטול', style: 'cancel' },
-      {
-        text: 'התנתק',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.auth.signOut();
-          if (error) {
-            Alert.alert('שגיאה', 'לא הצלחנו להתנתק. נסה שוב.');
-            return;
-          }
-          // The root layout's guard sends signed-out users to login
-        },
-      },
-    ]);
-  };
 
   return (
     <View style={styles.screen}>
@@ -105,7 +86,7 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity onPress={comingSoon} hitSlop={10}>
+        <TouchableOpacity onPress={openSettings} hitSlop={10} accessibilityLabel="הגדרות">
           <Ionicons name="settings-sharp" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
@@ -161,8 +142,8 @@ export default function ProfileScreen() {
           <View style={[styles.card, styles.menuCard]}>
             <MenuRow icon="person" label="עריכת פרופיל" onPress={openEditProfile} />
             <MenuRow icon="stats-chart" label="הסטטיסטיקות שלי" onPress={openMyStats} />
-            <MenuRow icon="settings-sharp" label="הגדרות" onPress={comingSoon} />
-            <MenuRow icon="log-out-outline" label="התנתקות" onPress={confirmLogout} danger last />
+            <MenuRow icon="settings-sharp" label="הגדרות" onPress={openSettings} />
+            <MenuRow icon="log-out-outline" label="התנתקות" onPress={confirmSignOut} danger last />
           </View>
         </ScrollView>
       )}
