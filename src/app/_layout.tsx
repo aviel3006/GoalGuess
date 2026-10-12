@@ -36,6 +36,7 @@ function RootNavigator() {
         <Stack.Screen name="edit-leagues" />
         <Stack.Screen name="news" />
         <Stack.Screen name="edit-teams" />
+        <Stack.Screen name="edit-profile" />
       </Stack.Protected>
 
       {/* Has a username but hasn't picked leagues for the world tables yet */}

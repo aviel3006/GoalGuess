@@ -23,6 +23,7 @@ import {
   type ProfileLeague,
 } from '../../hooks/use-profile';
 import { supabase } from '../../supabase';
+import { flagEmoji } from '../../utils/countries';
 
 const GREEN = '#00E676';
 const GOLD = '#F5C542';
@@ -45,10 +46,8 @@ const ACHIEVEMENT_STYLE: Record<AchievementId, { color: string; icon: McIconName
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-function flagEmoji(countryCode: string) {
-  const code = countryCode.trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(code)) return null;
-  return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+function openEditProfile() {
+  router.push('/edit-profile');
 }
 
 function comingSoon() {
@@ -156,7 +155,7 @@ export default function ProfileScreen() {
           <LeaguesSection leagues={state.data.leagues} />
 
           <View style={[styles.card, styles.menuCard]}>
-            <MenuRow icon="person" label="עריכת פרופיל" onPress={comingSoon} />
+            <MenuRow icon="person" label="עריכת פרופיל" onPress={openEditProfile} />
             <MenuRow icon="stats-chart" label="הסטטיסטיקות שלי" onPress={comingSoon} />
             <MenuRow icon="settings-sharp" label="הגדרות" onPress={comingSoon} />
             <MenuRow icon="log-out-outline" label="התנתקות" onPress={confirmLogout} danger last />
@@ -184,7 +183,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
           )}
         </View>
 
-        <TouchableOpacity style={styles.editBadge} onPress={comingSoon} hitSlop={6}>
+        <TouchableOpacity style={styles.editBadge} onPress={openEditProfile} hitSlop={6}>
           <Ionicons name="pencil" size={16} color="#03210F" />
         </TouchableOpacity>
       </View>
