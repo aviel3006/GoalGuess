@@ -15,14 +15,39 @@ export type ProfileLeague = {
 };
 
 export type AchievementId =
+  // Easy
   | 'first-prediction'
+  | 'first-correct'
+  | 'join-league'
+  // Medium
+  | 'first-exact'
+  | 'streak-3'
+  | 'points-50'
+  | 'predictions-50'
+  // Hard
   | 'streak-5'
-  | 'league-champion'
   | 'points-100'
-  | 'exact-expert';
+  | 'exact-10'
+  | 'round-20'
+  // Epic
+  | 'streak-10'
+  | 'points-250'
+  | 'exact-25'
+  | 'league-champion'
+  | 'global-top-10'
+  // Legendary
+  | 'exact-expert'
+  | 'points-500'
+  | 'perfect-round'
+  | 'global-first';
+
+// Easiest first
+export type AchievementTier = 'easy' | 'medium' | 'hard' | 'epic' | 'legendary';
+export const ACHIEVEMENT_TIERS: AchievementTier[] = ['easy', 'medium', 'hard', 'epic', 'legendary'];
 
 export type Achievement = {
   id: AchievementId;
+  tier: AchievementTier;
   title: string;
   description: string;
   unlocked: boolean;
@@ -71,6 +96,8 @@ type MyPrediction = {
 
 type Match = {
   id: number;
+  season: string;
+  round: number;
   home_score: number | null;
   away_score: number | null;
   kickoff_time: string;
@@ -112,6 +139,24 @@ function longestWinningStreak(predictions: MyPrediction[], matches: Map<number, 
   return best;
 }
 
+const CHAMPION_MIN_MEMBERS = 3;
+const PERFECT_ROUND_MIN_GAMES = 5;
+
+// Points and correct guesses per round. Round numbers restart every season.
+function roundResults(graded: MyPrediction[], matches: Map<number, Match>) {
+  const rounds = new Map<string, { points: number; games: number; correct: number }>();
+  for (const p of graded) {
+    const match = matches.get(p.match_id)!;
+    const key = `${match.season}:${match.round}`;
+    const round = rounds.get(key) ?? { points: 0, games: 0, correct: 0 };
+    round.points += p.points;
+    round.games += 1;
+    if (p.points > 0) round.correct += 1;
+    rounds.set(key, round);
+  }
+  return [...rounds.values()];
+}
+
 async function loadProfile(): Promise<State> {
   const {
     data: { user },
@@ -147,7 +192,7 @@ async function loadProfile(): Promise<State> {
   if (matchIds.length > 0) {
     const { data, error } = await supabase
       .from('matches')
-      .select('id, home_score, away_score, kickoff_time, status')
+      .select('id, season, round, home_score, away_score, kickoff_time, status')
       .in('id', matchIds);
     if (error) throw error;
     matches = new Map(((data ?? []) as Match[]).map((m) => [m.id, m]));
@@ -184,48 +229,78 @@ async function loadProfile(): Promise<State> {
 
   // --- Achievements (derived from real activity) ---
   const streak = longestWinningStreak(myPredictions, matches);
-  const isChampion = leagues.some((l) => l.rank === 1 && l.points > 0);
+  const rounds = roundResults(myGraded, matches);
+  const bestRoundPoints = Math.max(0, ...rounds.map((r) => r.points));
+  const hasPerfectRound = rounds.some(
+    (r) => r.games >= PERFECT_ROUND_MIN_GAMES && r.correct === r.games
+  );
+  // A league of one (or two) is too easy to top
+  const isChampion = leagues.some(
+    (l) => l.rank === 1 && l.points > 0 && l.memberCount >= CHAMPION_MIN_MEMBERS
+  );
+  const ranked = globalRank !== null && totalPoints > 0;
+
+  const counter = (
+    id: AchievementId,
+    tier: AchievementTier,
+    title: string,
+    description: string,
+    value: number,
+    goal: number
+  ): Achievement => ({
+    id,
+    tier,
+    title,
+    description,
+    progress: Math.min(value, goal),
+    goal,
+    unlocked: value >= goal,
+  });
+  const flag = (
+    id: AchievementId,
+    tier: AchievementTier,
+    title: string,
+    description: string,
+    unlocked: boolean
+  ): Achievement => counter(id, tier, title, description, unlocked ? 1 : 0, 1);
+
   const achievements: Achievement[] = [
-    {
-      id: 'first-prediction',
-      title: 'ניחוש ראשון',
-      description: 'שליחת ניחוש ראשון',
-      progress: Math.min(myPredictions.length, 1),
-      goal: 1,
-      unlocked: myPredictions.length >= 1,
-    },
-    {
-      id: 'streak-5',
-      title: 'רצף 5',
-      description: '5 ניחושים נכונים ברצף',
-      progress: Math.min(streak, 5),
-      goal: 5,
-      unlocked: streak >= 5,
-    },
-    {
-      id: 'league-champion',
-      title: 'אלוף הליגה',
-      description: 'מקום ראשון בליגה',
-      progress: isChampion ? 1 : 0,
-      goal: 1,
-      unlocked: isChampion,
-    },
-    {
-      id: 'points-100',
-      title: '100 נקודות',
-      description: 'הגעת ל-100 נקודות',
-      progress: Math.min(totalPoints, 100),
-      goal: 100,
-      unlocked: totalPoints >= 100,
-    },
-    {
-      id: 'exact-expert',
-      title: 'מומחה ניחושים',
-      description: '50 ניחושים מדויקים',
-      progress: Math.min(exactPredictions, 50),
-      goal: 50,
-      unlocked: exactPredictions >= 50,
-    },
+    flag('first-prediction', 'easy', 'ניחוש ראשון', 'שליחת ניחוש ראשון', myPredictions.length > 0),
+    flag('first-correct', 'easy', 'בכיוון', 'ניחוש נכון ראשון', successful > 0),
+    flag('join-league', 'easy', 'שחקן קבוצתי', 'הצטרפות לליגה', leagues.length > 0),
+
+    flag('first-exact', 'medium', 'בול!', 'תוצאה מדויקת ראשונה', exactPredictions > 0),
+    counter('streak-3', 'medium', 'רצף 3', '3 ניחושים נכונים ברצף', streak, 3),
+    counter('points-50', 'medium', '50 נקודות', 'צבירת 50 נקודות', totalPoints, 50),
+    counter('predictions-50', 'medium', 'מתמיד', '50 ניחושים', myPredictions.length, 50),
+
+    counter('streak-5', 'hard', 'רצף 5', '5 ניחושים נכונים ברצף', streak, 5),
+    counter('points-100', 'hard', '100 נקודות', 'צבירת 100 נקודות', totalPoints, 100),
+    counter('exact-10', 'hard', 'צלף', '10 תוצאות מדויקות', exactPredictions, 10),
+    counter('round-20', 'hard', 'מחזור חם', '20 נקודות במחזור אחד', bestRoundPoints, 20),
+
+    counter('streak-10', 'epic', 'בלתי עציר', '10 ניחושים נכונים ברצף', streak, 10),
+    counter('points-250', 'epic', '250 נקודות', 'צבירת 250 נקודות', totalPoints, 250),
+    counter('exact-25', 'epic', 'צלף על', '25 תוצאות מדויקות', exactPredictions, 25),
+    flag(
+      'league-champion',
+      'epic',
+      'אלוף הליגה',
+      `מקום ראשון בליגה של ${CHAMPION_MIN_MEMBERS}+ משתתפים`,
+      isChampion
+    ),
+    flag('global-top-10', 'epic', 'טופ 10', 'עשרת הראשונים בדירוג העולמי', ranked && globalRank <= 10),
+
+    counter('exact-expert', 'legendary', 'מומחה ניחושים', '50 תוצאות מדויקות', exactPredictions, 50),
+    counter('points-500', 'legendary', '500 נקודות', 'צבירת 500 נקודות', totalPoints, 500),
+    flag(
+      'perfect-round',
+      'legendary',
+      'מחזור מושלם',
+      `כל הניחושים נכונים במחזור (${PERFECT_ROUND_MIN_GAMES}+ משחקים)`,
+      hasPerfectRound
+    ),
+    flag('global-first', 'legendary', 'מספר 1', 'מקום ראשון בדירוג העולמי', ranked && globalRank === 1),
   ];
 
   const meta = user.user_metadata ?? {};

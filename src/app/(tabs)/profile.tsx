@@ -15,9 +15,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  ACHIEVEMENT_TIERS,
   useProfile,
   type Achievement,
   type AchievementId,
+  type AchievementTier,
   type ProfileData,
   type ProfileLeague,
 } from '../../hooks/use-profile';
@@ -35,12 +37,37 @@ const LEAGUES_PREVIEW = 2;
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type McIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-const ACHIEVEMENT_STYLE: Record<AchievementId, { color: string; icon: McIconName }> = {
-  'first-prediction': { color: '#C3CCC7', icon: 'soccer' },
-  'streak-5': { color: '#FF8A3D', icon: 'fire' },
-  'league-champion': { color: GOLD, icon: 'trophy' },
-  'points-100': { color: '#C9D3CE', icon: 'chart-bar' },
-  'exact-expert': { color: GREEN, icon: 'target' },
+const ACHIEVEMENT_ICONS: Record<AchievementId, McIconName> = {
+  'first-prediction': 'soccer',
+  'first-correct': 'check-decagram',
+  'join-league': 'account-group',
+  'first-exact': 'bullseye',
+  'streak-3': 'fire',
+  'points-50': 'star',
+  'predictions-50': 'clipboard-check',
+  'streak-5': 'fire',
+  'points-100': 'chart-bar',
+  'exact-10': 'target',
+  'round-20': 'lightning-bolt',
+  'streak-10': 'fire',
+  'points-250': 'chart-line',
+  'exact-25': 'target-account',
+  'league-champion': 'trophy',
+  'global-top-10': 'earth',
+  'exact-expert': 'crosshairs-gps',
+  'points-500': 'crown',
+  'perfect-round': 'diamond-stone',
+  'global-first': 'medal',
+};
+
+// Difficulty colors, checked with the dataviz palette validator on the badge background.
+// Blue and purple are close for some colorblind users, so every badge also names its tier.
+const TIER_STYLE: Record<AchievementTier, { label: string; color: string }> = {
+  easy: { label: 'קל', color: '#8E9A94' },
+  medium: { label: 'בינוני', color: '#16A34A' },
+  hard: { label: 'קשה', color: '#1E56E0' },
+  epic: { label: 'אפי', color: '#B95CF0' },
+  legendary: { label: 'אגדי', color: '#D97706' },
 };
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -311,31 +338,70 @@ function SectionHeader({
   );
 }
 
+const tierIndex = (tier: AchievementTier) => ACHIEVEMENT_TIERS.indexOf(tier);
+
+// Collapsed row: earned badges first (hardest first), then the next ones to chase (easiest first)
+function previewOrder(achievements: Achievement[]) {
+  const unlocked = achievements
+    .filter((a) => a.unlocked)
+    .sort((a, b) => tierIndex(b.tier) - tierIndex(a.tier));
+  const locked = achievements
+    .filter((a) => !a.unlocked)
+    .sort((a, b) => tierIndex(a.tier) - tierIndex(b.tier) || b.progress / b.goal - a.progress / a.goal);
+  return [...unlocked, ...locked];
+}
+
 function AchievementsSection({ achievements }: { achievements: Achievement[] }) {
   const [expanded, setExpanded] = useState(false);
+  const unlockedCount = achievements.filter((a) => a.unlocked).length;
 
   return (
     <View style={styles.section}>
       <SectionHeader
         icon={<Ionicons name="trophy" size={20} color={GOLD} />}
-        title="הישגים"
+        title={`הישגים · ${unlockedCount}/${achievements.length}`}
         onShowAll={() => setExpanded((v) => !v)}
         showAllLabel={expanded ? 'הצג פחות' : 'הצג הכל'}
       />
 
+      <View style={styles.tierLegend}>
+        {ACHIEVEMENT_TIERS.map((tier) => (
+          <View key={tier} style={styles.tierLegendItem}>
+            <View style={[styles.tierDot, { backgroundColor: TIER_STYLE[tier].color }]} />
+            <Text style={styles.tierLegendText}>{TIER_STYLE[tier].label}</Text>
+          </View>
+        ))}
+      </View>
+
       {expanded ? (
-        <View style={styles.achievementsGrid}>
-          {achievements.map((a) => (
-            <AchievementBadge key={a.id} achievement={a} />
-          ))}
-        </View>
+        ACHIEVEMENT_TIERS.map((tier) => {
+          const inTier = achievements.filter((a) => a.tier === tier);
+          if (inTier.length === 0) return null;
+          const earned = inTier.filter((a) => a.unlocked).length;
+          return (
+            <View key={tier} style={styles.tierGroup}>
+              <View style={styles.tierHeader}>
+                <View style={[styles.tierBar, { backgroundColor: TIER_STYLE[tier].color }]} />
+                <Text style={styles.tierTitle}>{TIER_STYLE[tier].label}</Text>
+                <Text style={styles.tierCount}>
+                  {earned}/{inTier.length}
+                </Text>
+              </View>
+              <View style={styles.achievementsGrid}>
+                {inTier.map((a) => (
+                  <AchievementBadge key={a.id} achievement={a} />
+                ))}
+              </View>
+            </View>
+          );
+        })
       ) : (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.achievementsRow}
         >
-          {achievements.map((a) => (
+          {previewOrder(achievements).map((a) => (
             <AchievementBadge key={a.id} achievement={a} />
           ))}
         </ScrollView>
@@ -345,43 +411,43 @@ function AchievementsSection({ achievements }: { achievements: Achievement[] }) 
 }
 
 function AchievementBadge({ achievement }: { achievement: Achievement }) {
-  const { color, icon } = ACHIEVEMENT_STYLE[achievement.id];
-  const tint = achievement.unlocked ? color : '#59655F';
-  const showProgress = !achievement.unlocked && achievement.goal > 1 && achievement.progress > 0;
+  const icon = ACHIEVEMENT_ICONS[achievement.id];
+  const tier = TIER_STYLE[achievement.tier];
+  const { unlocked } = achievement;
+  const showProgress = !unlocked && achievement.goal > 1 && achievement.progress > 0;
 
   return (
     <View
       style={[
         styles.badge,
-        achievement.unlocked
-          ? { backgroundColor: `${color}17`, borderColor: `${color}80` }
-          : styles.badgeLocked,
+        unlocked
+          ? { backgroundColor: `${tier.color}1F`, borderColor: `${tier.color}99` }
+          : { ...styles.badgeLocked, borderColor: `${tier.color}40` },
       ]}
+      accessible
+      accessibilityLabel={`${achievement.title}, ${tier.label}, ${unlocked ? 'הושג' : 'נעול'}. ${achievement.description}`}
     >
       <View style={styles.hexWrap}>
         <MaterialCommunityIcons
           name="hexagon"
           size={60}
-          color={achievement.unlocked ? `${color}38` : '#1A2420'}
+          color={unlocked ? `${tier.color}40` : '#141D19'}
           style={StyleSheet.absoluteFill}
         />
         <MaterialCommunityIcons
           name="hexagon-outline"
           size={60}
-          color={tint}
+          color={unlocked ? tier.color : `${tier.color}66`}
           style={StyleSheet.absoluteFill}
         />
         <MaterialCommunityIcons
-          name={achievement.unlocked ? icon : 'lock'}
+          name={unlocked ? icon : 'lock'}
           size={24}
-          color={achievement.unlocked ? color : '#7B8781'}
+          color={unlocked ? tier.color : '#7B8781'}
         />
       </View>
 
-      <Text
-        style={[styles.badgeTitle, !achievement.unlocked && styles.badgeTitleLocked]}
-        numberOfLines={1}
-      >
+      <Text style={[styles.badgeTitle, !unlocked && styles.badgeTitleLocked]} numberOfLines={1}>
         {achievement.title}
       </Text>
       <Text style={styles.badgeDescription} numberOfLines={2}>
@@ -389,6 +455,11 @@ function AchievementBadge({ achievement }: { achievement: Achievement }) {
           ? `${achievement.progress}/${achievement.goal} · ${achievement.description}`
           : achievement.description}
       </Text>
+
+      <View style={styles.tierChip}>
+        <View style={[styles.tierDot, { backgroundColor: tier.color }]} />
+        <Text style={styles.tierChipText}>{tier.label}</Text>
+      </View>
     </View>
   );
 }
@@ -754,7 +825,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     width: 104,
-    minHeight: 130,
+    minHeight: 150,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
@@ -787,6 +858,64 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 3,
     textAlign: 'center',
+  },
+  tierChip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 'auto',
+    paddingTop: 6,
+  },
+  tierChipText: {
+    color: '#C9D4CE',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  tierDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  tierLegend: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: -2,
+    marginBottom: 10,
+  },
+  tierLegendItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+  },
+  tierLegendText: {
+    color: MUTED,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tierGroup: {
+    marginBottom: 14,
+  },
+  tierHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tierBar: {
+    width: 4,
+    height: 16,
+    borderRadius: 2,
+  },
+  tierTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  tierCount: {
+    color: MUTED,
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   // Leagues
