@@ -8,7 +8,20 @@ type RoundMatch = {
   status: string;
 };
 
-// Round number -> time (ms) when predictions for that round close
+// Round numbers restart every season, so screens that group by round must first narrow
+// the matches to one season: the one of the latest kickoff.
+export function currentSeasonMatches<T extends { season: string; kickoff_time: string }>(
+  matches: T[]
+) {
+  const latest = matches.reduce<T | null>(
+    (best, m) => (best === null || m.kickoff_time > best.kickoff_time ? m : best),
+    null
+  );
+  return latest ? matches.filter((m) => m.season === latest.season) : [];
+}
+
+// Round number -> time (ms) when predictions for that round close.
+// Expects matches of a single season (see currentSeasonMatches).
 export function getRoundDeadlines(matches: RoundMatch[]) {
   const deadlines = new Map<number, number>();
   for (const m of matches) {

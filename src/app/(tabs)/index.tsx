@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useProfile } from '../../hooks/use-profile';
 import { supabase } from '../../supabase';
-import { getCurrentRound } from '../../utils/round-deadline';
+import { currentSeasonMatches, getCurrentRound } from '../../utils/round-deadline';
 // The "איך זה עובד?" button is drawn inside the banner image, so we overlay a
 // transparent touch area on it. Coordinates are in the source image's pixels.
 const BANNER_IMAGE = { width: 1844, height: 853 };
@@ -47,7 +47,7 @@ export default function HomeScreen() {
     const loadMatches = async () => {
       const { data, error } = await supabase
         .from('matches')
-        .select('round, kickoff_time, status')
+        .select('season, round, kickoff_time, status')
         .order('kickoff_time', { ascending: true });
 
       if (error) {
@@ -55,7 +55,7 @@ export default function HomeScreen() {
         return;
       }
 
-      setMatches(data ?? []);
+      setMatches(currentSeasonMatches(data ?? []));
       setNow(Date.now());
     };
 

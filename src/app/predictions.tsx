@@ -13,12 +13,13 @@ import {
 
 import { LOGO_SIZE, TeamLogo } from '../components/team-logo';
 import { supabase } from '../supabase';
-import { getRoundDeadlines, isMatchOpen } from '../utils/round-deadline';
+import { currentSeasonMatches, getRoundDeadlines, isMatchOpen } from '../utils/round-deadline';
 
 type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled';
 
 type Match = {
   id: number;
+  season: string;
   round: number;
   home_team: string;
   away_team: string;
@@ -86,7 +87,7 @@ export default function PredictionsScreen() {
     const [matchesRes, predictionsRes] = await Promise.all([
       supabase
         .from('matches')
-        .select('id, round, home_team, away_team, kickoff_time, home_score, away_score, status, home_badge, away_badge')
+        .select('id, season, round, home_team, away_team, kickoff_time, home_score, away_score, status, home_badge, away_badge')
         .order('kickoff_time'),
       supabase
         .from('predictions')
@@ -100,7 +101,7 @@ export default function PredictionsScreen() {
       return;
     }
 
-    const loadedMatches = (matchesRes.data ?? []) as Match[];
+    const loadedMatches = currentSeasonMatches((matchesRes.data ?? []) as Match[]);
     const loadedSaved: Record<number, SavedPrediction> = {};
     for (const p of (predictionsRes.data ?? []) as PredictionRow[]) {
       loadedSaved[p.match_id] = {
