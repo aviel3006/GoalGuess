@@ -593,40 +593,6 @@ function PlayerRow({
   );
 }
 
-function NavItem({
-  icon,
-  label,
-  active = false,
-  onPress,
-}: {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  label: string;
-  active?: boolean;
-  onPress?: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={styles.navItem}
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <Ionicons
-        name={icon}
-        size={23}
-        color={active ? GREEN : '#858B88'}
-      />
-      <Text
-        style={[
-          styles.navText,
-          active && styles.activeNavText,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
   
 container: {
@@ -988,26 +954,5 @@ paddingBottom: 12,
     fontSize: 13,
     marginTop: 9,
     textAlign: 'center',
-  },
-  bottomBar: {
-    flexDirection: 'row-reverse',
-    backgroundColor: '#07100B',
-    borderTopWidth: 1,
-    borderTopColor: '#1A3925',
-    paddingTop: 11,
-    paddingBottom: 14,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 5,
-  },
-  navText: {
-    color: '#858B88',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  activeNavText: {
-    color: GREEN,
   },
 });

@@ -32,7 +32,6 @@ function RootNavigator() {
         <Stack.Screen name="match/[id]" />
         <Stack.Screen name="create-league" />
         <Stack.Screen name="league/[id]" />
-        <Stack.Screen name="explore" />
         <Stack.Screen name="world-tables" />
         <Stack.Screen name="edit-leagues" />
         <Stack.Screen name="news" />
