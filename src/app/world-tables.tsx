@@ -17,11 +17,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '../hooks/use-session';
 import { supabase } from '../supabase';
 import {
+  cleanStandings,
   leagueLogoUrl,
   teamLogoUrl,
   type StandingRow,
   type WorldLeague,
 } from '../utils/world-leagues';
+
+export { ScreenErrorBoundary as ErrorBoundary } from '../components/screen-error';
 
 const GREEN = '#00E676';
 const BG = '#040A07';
@@ -67,7 +70,7 @@ export default function WorldTablesScreen() {
       return;
     }
 
-    const loaded = (data ?? []) as WorldLeague[];
+    const loaded = (data ?? []).map((l) => ({ ...l, standings: cleanStandings(l.standings) }));
     setLeagues(loaded);
     setSelectedId((current) =>
       current !== null && loaded.some((l) => l.id === current) ? current : loaded[0]?.id ?? null
@@ -97,8 +100,14 @@ export default function WorldTablesScreen() {
         },
         (payload) => {
           const updated = payload.new as WorldLeague;
+          const standings = cleanStandings(updated.standings);
           setLeagues((current) =>
-            current.map((l) => (l.id === updated.id ? { ...l, ...updated } : l))
+            current.map((l) =>
+              // Keeps the table on screen if the update arrives without a usable one
+              l.id === updated.id
+                ? { ...l, ...updated, standings: standings ?? l.standings }
+                : l
+            )
           );
           setNow(Date.now());
         }

@@ -8,6 +8,12 @@ const API = 'https://webws.365scores.com';
 const QUERY = 'appTypeId=5&langId=2&timezoneName=Asia/Jerusalem&userCountryId=6';
 const COMPETITION_ID = 42; // ליגת העל
 const KEEP_DAYS = 30;
+const KEEP_AT_LEAST = 60;
+const REQUEST_TIMEOUT_MS = 10_000;
+// A league table with fewer teams than this is a broken answer, not the real table
+const MIN_TEAMS = 10;
+// Teams missing from the table this long were relegated
+const DROP_TEAM_AFTER_DAYS = 30;
 
 type ApiNews = {
   news?: {
@@ -43,45 +49,78 @@ const supabase = createClient(
 );
 
 async function get<T>(path: string, retries = 1): Promise<T> {
-  const res = await fetch(`${API}${path}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  // 365Scores occasionally answers 502/504 and is fine on the next try
-  if (res.status >= 500 && retries > 0) {
+  try {
+    const res = await fetch(`${API}${path}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      // A hanging request would otherwise hold the whole run
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`365Scores ${path} returned ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    // Timeouts, network errors and 502/504s are usually fine on the next try
+    if (retries === 0) throw error;
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return get(path, retries - 1);
   }
-  if (!res.ok) throw new Error(`365Scores ${path} returned ${res.status}`);
-  return res.json();
 }
+
+const isHttpUrl = (value: unknown): value is string =>
+  typeof value === 'string' && /^https?:\/\//.test(value);
 
 // Without isPreview=false the feed returns only the 3 newest articles
 function fetchNews(filter: string) {
   return get<ApiNews>(`/web/news/?${QUERY}&isPreview=false&${filter}`);
 }
 
+// Refreshes the team list from the league table. Never removes a team because of one bad
+// answer: teams only leave after being missing from the table for weeks.
 async function syncTeams() {
   const data = await get<ApiStandings>(`/web/standings/?${QUERY}&competitions=${COMPETITION_ID}`);
-  const rows = (data.standings ?? []).flatMap((s) => s.rows ?? []).filter((r) => r.competitor);
-  if (rows.length === 0) throw new Error('no teams in the league table');
+  const rows = (data?.standings ?? [])
+    .flatMap((s) => (Array.isArray(s?.rows) ? s.rows : []))
+    .filter(
+      (r) =>
+        typeof r?.competitor?.id === 'number' &&
+        typeof r.competitor.name === 'string' &&
+        r.competitor.name.trim() !== '',
+    );
 
-  const teams = rows.map((r) => ({
+  const unique = new Map(rows.map((r) => [r.competitor.id, r]));
+  if (unique.size < MIN_TEAMS) {
+    throw new Error(`league table has only ${unique.size} teams`);
+  }
+
+  const teams = [...unique.values()].map((r) => ({
     id: r.competitor.id,
-    name: r.competitor.name,
+    name: r.competitor.name.trim(),
     image_version: r.competitor.imageVersion ?? 1,
-    sort_order: r.position,
+    sort_order: typeof r.position === 'number' ? r.position : 0,
     updated_at: new Date().toISOString(),
   }));
 
   const { error } = await supabase.from('news_teams').upsert(teams);
   if (error) throw error;
 
-  // Relegated teams leave the picker
+  const staleBefore = new Date(Date.now() - DROP_TEAM_AFTER_DAYS * 24 * 60 * 60 * 1000);
   const { error: deleteError } = await supabase
     .from('news_teams')
     .delete()
-    .not('id', 'in', `(${teams.map((t) => t.id).join(',')})`);
+    .lt('updated_at', staleBefore.toISOString());
   if (deleteError) throw deleteError;
+}
 
-  return teams.map((t) => t.id);
+// The teams to pull news for: the saved list, refreshed first when 365Scores cooperates
+async function loadTeams() {
+  try {
+    await syncTeams();
+  } catch (error) {
+    console.warn('sync-news: keeping the saved teams, league table failed:', error);
+  }
+
+  const { data, error } = await supabase.from('news_teams').select('id');
+  if (error) throw error;
+  return (data ?? []).map((t: { id: number }) => t.id);
 }
 
 Deno.serve(async (req) => {
@@ -92,19 +131,35 @@ Deno.serve(async (req) => {
   if (!authorized) return new Response('Unauthorized', { status: 401 });
 
   try {
-    const teamIds = await syncTeams();
+    const teamIds = await loadTeams();
     const articles = new Map<number, Article>();
 
     const collect = (data: ApiNews, teamId: number | null) => {
-      const sources = new Map((data.newsSources ?? []).map((s) => [s.id, s.name]));
-      for (const item of data.news ?? []) {
+      const sources = new Map(
+        (Array.isArray(data?.newsSources) ? data.newsSources : []).map((s) => [s?.id, s?.name]),
+      );
+      for (const item of Array.isArray(data?.news) ? data.news : []) {
+        // Skip anything malformed instead of failing the whole feed over one item
+        const published = Date.parse(item?.publishDate);
+        if (
+          typeof item?.id !== 'number' ||
+          typeof item.title !== 'string' ||
+          item.title.trim() === '' ||
+          !isHttpUrl(item.url) ||
+          Number.isNaN(published) ||
+          published > Date.now() + 24 * 60 * 60 * 1000
+        ) {
+          continue;
+        }
+
+        const source = sources.get(item.sourceId);
         const article = articles.get(item.id) ?? {
           id: item.id,
           title: item.title.trim(),
-          image: item.image || null,
+          image: isHttpUrl(item.image) ? item.image : null,
           url: item.url,
-          source_name: sources.get(item.sourceId) ?? null,
-          published_at: item.publishDate,
+          source_name: typeof source === 'string' ? source : null,
+          published_at: new Date(published).toISOString(),
           team_ids: new Set<number>(),
         };
         if (teamId !== null) article.team_ids.add(teamId);
@@ -113,12 +168,29 @@ Deno.serve(async (req) => {
     };
 
     // The league feed has general news; each team's feed tells us who an article is about
-    const feeds = await Promise.allSettled([
-      fetchNews(`competitions=${COMPETITION_ID}`).then((data) => collect(data, null)),
-      ...teamIds.map((id) => fetchNews(`competitors=${id}`).then((data) => collect(data, id))),
+    const [leagueFeed, ...teamFeeds] = await Promise.allSettled([
+      fetchNews(`competitions=${COMPETITION_ID}`),
+      ...teamIds.map((id) => fetchNews(`competitors=${id}`)),
     ]);
-    const failed = feeds.filter((f) => f.status === 'rejected').map((f) => String(f.reason));
+    const failed = [leagueFeed, ...teamFeeds]
+      .filter((f) => f.status === 'rejected')
+      .map((f) => String((f as PromiseRejectedResult).reason));
     if (failed.length) console.error('Failed feeds', failed);
+
+    const idsOf = (data: ApiNews) =>
+      (Array.isArray(data?.news) ? data.news : []).map((n) => n?.id).sort().join(',');
+    const leagueIds = leagueFeed.status === 'fulfilled' ? idsOf(leagueFeed.value) : '';
+    if (leagueFeed.status === 'fulfilled') collect(leagueFeed.value, null);
+
+    teamFeeds.forEach((feed, i) => {
+      if (feed.status !== 'fulfilled') return;
+      // If 365Scores ever ignores the team filter, every team would get every article
+      if (leagueIds !== '' && idsOf(feed.value) === leagueIds) {
+        console.warn(`sync-news: team ${teamIds[i]} feed matches the league feed, not tagging it`);
+        return;
+      }
+      collect(feed.value, teamIds[i]);
+    });
 
     const ids = [...articles.keys()];
     if (ids.length > 0) {
@@ -138,12 +210,23 @@ Deno.serve(async (req) => {
       if (error) throw error;
     }
 
-    const cutoff = new Date(Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    const { error: pruneError } = await supabase
+    // Old articles go, but the newest few always stay so a long outage never empties the screen
+    const { data: newest, error: newestError } = await supabase
       .from('news_articles')
-      .delete()
-      .lt('published_at', cutoff);
-    if (pruneError) throw pruneError;
+      .select('published_at')
+      .order('published_at', { ascending: false })
+      .range(KEEP_AT_LEAST - 1, KEEP_AT_LEAST - 1);
+    if (newestError) throw newestError;
+
+    const floor = newest?.[0]?.published_at;
+    if (floor) {
+      const cutoff = Math.min(Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000, Date.parse(floor));
+      const { error: pruneError } = await supabase
+        .from('news_articles')
+        .delete()
+        .lt('published_at', new Date(cutoff).toISOString());
+      if (pruneError) throw pruneError;
+    }
 
     return Response.json({ articles: ids.length, teams: teamIds.length, failed });
   } catch (error) {

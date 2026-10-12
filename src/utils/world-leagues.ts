@@ -41,3 +41,50 @@ export type WorldLeague = {
   standings: Standings | null;
   updated_at: string | null;
 };
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const toNumber = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+
+// The standings come from an unofficial API, so anything off-shape is dropped
+// rather than trusted: a half-broken table is better than a crashed screen.
+export function cleanStandings(value: unknown): Standings | null {
+  if (!isObject(value) || !Array.isArray(value.groups)) return null;
+
+  const groups = value.groups.filter(isObject).map((group) => ({
+    name: typeof group.name === 'string' ? group.name : null,
+    rows: (Array.isArray(group.rows) ? group.rows : [])
+      .filter((row): row is Record<string, unknown> => isObject(row) && typeof row.team_id === 'number')
+      .map((row) => ({
+        position: toNumber(row.position),
+        team_id: row.team_id as number,
+        name: typeof row.name === 'string' ? row.name : '',
+        short_name: typeof row.short_name === 'string' ? row.short_name : null,
+        image_version: toNumber(row.image_version) || 1,
+        played: toNumber(row.played),
+        won: toNumber(row.won),
+        drawn: toNumber(row.drawn),
+        lost: toNumber(row.lost),
+        goals_for: toNumber(row.goals_for),
+        goals_against: toNumber(row.goals_against),
+        points: toNumber(row.points),
+        form: (Array.isArray(row.form) ? row.form : []).filter(
+          (f): f is 'W' | 'D' | 'L' => f === 'W' || f === 'D' || f === 'L'
+        ),
+        destination: typeof row.destination === 'number' ? row.destination : null,
+      })),
+  }));
+
+  const destinations = (Array.isArray(value.destinations) ? value.destinations : [])
+    .filter(isObject)
+    .filter((d) => typeof d.num === 'number')
+    .map((d) => ({
+      num: d.num as number,
+      name: typeof d.name === 'string' ? d.name : '',
+      color: typeof d.color === 'string' ? d.color : '#8A8F8C',
+    }));
+
+  const nonEmpty = groups.filter((g) => g.rows.length > 0);
+  return nonEmpty.length > 0 ? { groups: nonEmpty, destinations } : null;
+}

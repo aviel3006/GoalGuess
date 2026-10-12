@@ -26,6 +26,8 @@ import {
 } from '../utils/news';
 import { teamLogoUrl } from '../utils/world-leagues';
 
+export { ScreenErrorBoundary as ErrorBoundary } from '../components/screen-error';
+
 const GREEN = '#00E676';
 const BG = '#040A07';
 const CARD = '#0D1510';

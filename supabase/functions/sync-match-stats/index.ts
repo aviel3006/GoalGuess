@@ -9,6 +9,7 @@ const QUERY = 'appTypeId=5&langId=2&timezoneName=Asia/Jerusalem&userCountryId=6'
 const COMPETITION_ID = 42; // ליגת העל
 const MAX_MATCHES_PER_RUN = 15;
 const MAX_RESULT_PAGES = 6;
+const REQUEST_TIMEOUT_MS = 10_000;
 // Stats keep being corrected for a few hours after the final whistle
 const REFRESH_UNTIL_HOURS_AFTER_KICKOFF = 6;
 const REFRESH_EVERY_MINUTES = 30;
@@ -64,15 +65,27 @@ const supabase = createClient(
 );
 
 async function get<T>(path: string, retries = 1): Promise<T> {
-  const res = await fetch(`${API}${path}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  // 365Scores occasionally answers 502/504 and is fine on the next try
-  if (res.status >= 500 && retries > 0) {
+  try {
+    const res = await fetch(`${API}${path}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      // A hanging request would otherwise hold the whole run
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`365Scores ${path} returned ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    // Timeouts, network errors and 502/504s are usually fine on the next try
+    if (retries === 0) throw error;
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return get(path, retries - 1);
   }
-  if (!res.ok) throw new Error(`365Scores ${path} returned ${res.status}`);
-  return res.json();
 }
+
+// 365Scores games that have both teams; anything else can't be matched to ours
+const isGame = (g: ApiGame) =>
+  typeof g?.id === 'number' &&
+  typeof g.homeCompetitor?.name === 'string' &&
+  typeof g.awayCompetitor?.name === 'string';
 
 // Both sources spell some names differently ("קריית"/"קרית", "תקווה"/"תקוה"),
 // so compare without vav, yod, punctuation and spaces
@@ -103,7 +116,10 @@ function needsFetch(match: StoredMatch) {
 
 function toStats(stats: ApiStat[], homeId: number) {
   const byId = new Map<number, { home?: ApiStat; away?: ApiStat }>();
-  for (const s of stats) {
+  const valid = stats.filter(
+    (s) => typeof s?.id === 'number' && typeof s.name === 'string' && s.value !== undefined,
+  );
+  for (const s of valid) {
     const pair = byId.get(s.id) ?? {};
     if (s.competitorId === homeId) pair.home = s;
     else pair.away = s;
@@ -112,12 +128,12 @@ function toStats(stats: ApiStat[], homeId: number) {
 
   return [...byId.values()]
     .filter((p): p is { home: ApiStat; away: ApiStat } => !!p.home && !!p.away)
-    .sort((a, b) => a.home.order - b.home.order)
+    .sort((a, b) => (a.home.order ?? 0) - (b.home.order ?? 0))
     .map(({ home, away }) => ({
       name: home.name,
       category: home.categoryName ?? null,
-      home: home.value,
-      away: away.value,
+      home: String(home.value),
+      away: String(away.value),
       homeShare: home.valuePercentage ?? 0,
       awayShare: away.valuePercentage ?? 0,
       // 365Scores marks the team that did better: 1 home, 2 away
@@ -136,12 +152,13 @@ const PENALTY_SUBTYPE = 3;
 const SECOND_YELLOW_SUBTYPE = 21;
 
 function toEvents(game: ApiGameDetails) {
-  const players = new Map((game.members ?? []).map((m) => [m.id, m.name]));
+  const members = Array.isArray(game.members) ? game.members : [];
+  const players = new Map(members.filter(Boolean).map((m) => [m.id, m.name]));
   const name = (id?: number) => (id ? players.get(id) ?? null : null);
 
-  return (game.events ?? [])
-    .filter((e) => [GOAL, YELLOW, RED].includes(e.eventType.id))
-    .sort((a, b) => a.order - b.order)
+  return (Array.isArray(game.events) ? game.events : [])
+    .filter((e) => [GOAL, YELLOW, RED].includes(e?.eventType?.id))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .map((e) => {
       const sub = e.eventType.subTypeId;
       const type = e.eventType.id === GOAL ? 'goal' : e.eventType.id === RED ? 'red' : 'yellow';
@@ -151,7 +168,7 @@ function toEvents(game: ApiGameDetails) {
       if (type === 'red' && sub === SECOND_YELLOW_SUBTYPE) detail = 'צהוב שני';
 
       return {
-        minute: e.gameTimeDisplay,
+        minute: String(e.gameTimeDisplay ?? ''),
         // For own goals competitorId is the team the goal counts for
         side: e.competitorId === game.homeCompetitor.id ? 'home' : 'away',
         type,
@@ -170,13 +187,13 @@ async function findGames(wanted: StoredMatch[]) {
 
   for (let page = 0; path && page < MAX_RESULT_PAGES; page++) {
     const body: { games?: ApiGame[]; paging?: { previousPage?: string } } = await get(path);
-    games = games.concat(body.games ?? []);
+    games = games.concat((Array.isArray(body?.games) ? body.games : []).filter(isGame));
     for (const m of wanted) {
       const game = found.has(m.id) ? undefined : findGame(m, games);
       if (game) found.set(m.id, game);
     }
     if (found.size === wanted.length) break;
-    path = body.paging?.previousPage ?? null;
+    path = typeof body?.paging?.previousPage === 'string' ? body.paging.previousPage : null;
   }
 
   return found;
@@ -213,28 +230,30 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      let statsBody: { statistics?: ApiStat[] };
-      let details: ApiGameDetails;
       try {
-        [statsBody, { game: details }] = await Promise.all([
+        const [statsBody, detailsBody] = await Promise.all([
           get<{ statistics?: ApiStat[] }>(`/web/game/stats/?${QUERY}&games=${game.id}`),
-          get<{ game: ApiGameDetails }>(`/web/game/?${QUERY}&gameId=${game.id}`),
+          get<{ game?: ApiGameDetails }>(`/web/game/?${QUERY}&gameId=${game.id}`),
         ]);
+        const details = detailsBody?.game;
+        if (typeof details?.homeCompetitor?.id !== 'number') throw new Error('game details missing');
+
+        rows.push({
+          match_id: match.id,
+          source_game_id: game.id,
+          venue: typeof details.venue?.name === 'string' ? details.venue.name : null,
+          stats: toStats(
+            Array.isArray(statsBody?.statistics) ? statsBody.statistics : [],
+            details.homeCompetitor.id,
+          ),
+          events: toEvents(details),
+          fetched_at: new Date().toISOString(),
+        });
       } catch (error) {
         // Retried on the next run; the other matches still get saved
         console.warn(`sync-match-stats: skipping match ${match.id}:`, error);
         failed.push(match.id);
-        continue;
       }
-
-      rows.push({
-        match_id: match.id,
-        source_game_id: game.id,
-        venue: details.venue?.name ?? null,
-        stats: toStats(statsBody.statistics ?? [], details.homeCompetitor.id),
-        events: toEvents(details),
-        fetched_at: new Date().toISOString(),
-      });
     }
 
     if (rows.length > 0) {

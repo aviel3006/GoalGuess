@@ -2,6 +2,9 @@ import { SplashScreen, Stack } from 'expo-router';
 
 import { SessionProvider, useSession } from '../hooks/use-session';
 
+// If anything below throws, show a retry screen instead of crashing the app
+export { RootErrorBoundary as ErrorBoundary } from '../components/screen-error';
+
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {

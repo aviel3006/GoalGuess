@@ -13,6 +13,8 @@ import {
 import { TeamLogo } from '../../components/team-logo';
 import { supabase } from '../../supabase';
 
+export { ScreenErrorBoundary as ErrorBoundary } from '../../components/screen-error';
+
 type Match = {
   id: number;
   round: number;
@@ -63,6 +65,51 @@ const EVENT_ICON: Record<MatchEvent['type'], string> = {
   red: '🟥',
 };
 
+const isObject = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null;
+
+const text = (value: unknown) =>
+  typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
+
+const share = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+
+// The stats come from an unofficial API: drop anything off-shape instead of crashing on it
+function cleanMatchStats(value: unknown): MatchStats | null {
+  if (!isObject(value)) return null;
+
+  const stats: Stat[] = (Array.isArray(value.stats) ? value.stats : [])
+    .filter((s: unknown) => isObject(s) && typeof s.name === 'string')
+    .map((s: Record<string, any>) => ({
+      name: s.name,
+      category: typeof s.category === 'string' ? s.category : null,
+      home: text(s.home),
+      away: text(s.away),
+      homeShare: share(s.homeShare),
+      awayShare: share(s.awayShare),
+      leader: s.leader === 'home' || s.leader === 'away' ? s.leader : null,
+      primary: s.primary === true,
+      top: s.top === true,
+    }));
+
+  const events: MatchEvent[] = (Array.isArray(value.events) ? value.events : [])
+    .filter(
+      (e: unknown) =>
+        isObject(e) &&
+        (e.side === 'home' || e.side === 'away') &&
+        (e.type === 'goal' || e.type === 'yellow' || e.type === 'red')
+    )
+    .map((e: Record<string, any>) => ({
+      minute: text(e.minute),
+      side: e.side,
+      type: e.type,
+      detail: typeof e.detail === 'string' ? e.detail : null,
+      player: typeof e.player === 'string' ? e.player : null,
+      assist: typeof e.assist === 'string' ? e.assist : null,
+    }));
+
+  return { venue: typeof value.venue === 'string' ? value.venue : null, stats, events };
+}
+
 const pad = (n: number) => String(n).padStart(2, '0');
 
 function formatDate(iso: string) {
@@ -94,7 +141,7 @@ export default function MatchStatsScreen() {
     }
 
     setMatch(matchRes.data as Match);
-    setDetails(statsRes.data as MatchStats | null);
+    setDetails(cleanMatchStats(statsRes.data));
     setLoadState('ready');
   }, [id]);
 
