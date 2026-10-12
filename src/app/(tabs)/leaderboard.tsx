@@ -157,6 +157,8 @@ const joinLeague = async () => {
 // The RPC appends the caller's own row when they are outside the top
 const topPlayers = (leaderboard ?? []).slice(0, LEADERBOARD_SIZE);
 const me = leaderboard?.find((entry) => entry.is_me) ?? null;
+// Before the first graded match everyone is tied at 0, so ranks and the podium are hidden
+const hasScores = topPlayers.some((entry) => entry.points > 0);
 
 const shareInvite = (league: { name: string; invite_code: string }) => {
   Share.share({
@@ -240,6 +242,7 @@ const shareInvite = (league: { name: string; invite_code: string }) => {
             </View>
           ) : (
           <>
+            {hasScores && (
             <View style={styles.podium}>
               <PodiumPlayer
                 player={topPlayers[1]}
@@ -255,15 +258,24 @@ const shareInvite = (league: { name: string; invite_code: string }) => {
                 color="#CD8B52"
               />
             </View>
+            )}
 
-            {topPlayers.length > 3 && (
+            <View style={styles.tableNote}>
+              <Ionicons name="time-outline" size={15} color="#8FA99A" />
+              <Text style={styles.tableNoteText}>
+                {hasScores
+                  ? 'הניקוד מתעדכן אוטומטית בסוף כל משחק'
+                  : 'הניקוד יתעדכן אוטומטית בסוף המשחק הראשון'}
+              </Text>
+            </View>
+
             <View style={styles.table}>
               <TableHeader />
 
-              {topPlayers.slice(3).map((player, index) => (
+              {topPlayers.map((player, index) => (
                 <PlayerRow
                   key={index}
-                  rank={player.rank}
+                  rank={hasScores ? player.rank : null}
                   name={entryName(player)}
                   exact={player.exact_count}
                   points={player.points}
@@ -271,24 +283,20 @@ const shareInvite = (league: { name: string; invite_code: string }) => {
                 />
               ))}
             </View>
-            )}
 
-            <Text style={styles.myTitle}>הדירוג שלי</Text>
-
-            {me ? (
-            <View style={styles.myCard}>
-              <PlayerRow
-                rank={me.rank}
-                name={entryName(me)}
-                exact={me.exact_count}
-                points={me.points}
-                highlighted
-              />
-            </View>
-            ) : (
-              <Text style={styles.myEmpty}>
-                עדיין אין לך ניקוד — נחש משחקים כדי להיכנס לטבלה
-              </Text>
+            {me && !topPlayers.includes(me) && (
+            <>
+              <Text style={styles.myTitle}>הדירוג שלי</Text>
+              <View style={styles.myCard}>
+                <PlayerRow
+                  rank={me.rank}
+                  name={entryName(me)}
+                  exact={me.exact_count}
+                  points={me.points}
+                  highlighted
+                />
+              </View>
+            </>
             )}
           </>
           )
@@ -539,7 +547,7 @@ function PlayerRow({
   points,
   highlighted = false,
 }: {
-  rank: number;
+  rank: number | null;
   name: string;
   exact: number;
   points: number;
@@ -553,7 +561,7 @@ function PlayerRow({
       ]}
     >
       <Text style={[styles.rowRank, styles.rankColumn]}>
-        {rank}
+        {rank ?? '–'}
       </Text>
 
       <View style={[styles.rowNameWrap, styles.nameColumn]}>
@@ -840,10 +848,17 @@ borderRadius: 27,
     marginTop: 27,
     marginBottom: 12,
   },
-  myEmpty: {
-    color: '#879B8C',
-    fontSize: 13,
-    textAlign: 'right',
+  tableNote: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  tableNoteText: {
+    color: '#8FA99A',
+    fontSize: 12,
+    fontWeight: '600',
   },
   loader: {
     marginTop: 40,

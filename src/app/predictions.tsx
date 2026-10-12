@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -24,6 +25,8 @@ type Match = {
   home_score: number | null;
   away_score: number | null;
   status: MatchStatus;
+  home_badge: string | null;
+  away_badge: string | null;
 };
 
 type Score = { home: number; away: number };
@@ -84,7 +87,7 @@ export default function PredictionsScreen() {
     const [matchesRes, predictionsRes] = await Promise.all([
       supabase
         .from('matches')
-        .select('id, round, home_team, away_team, kickoff_time, home_score, away_score, status')
+        .select('id, round, home_team, away_team, kickoff_time, home_score, away_score, status, home_badge, away_badge')
         .order('kickoff_time'),
       supabase
         .from('predictions')
@@ -321,9 +324,7 @@ export default function PredictionsScreen() {
 
                   <View style={styles.matchRow}>
                     <View style={styles.team}>
-                      <View style={styles.logoCircle}>
-                        <Text style={styles.ball}>⚽</Text>
-                      </View>
+                      <TeamLogo badge={game.home_badge} />
 
                       <Text style={styles.teamName}>
                         {game.home_team}
@@ -385,9 +386,7 @@ export default function PredictionsScreen() {
                     )}
 
                     <View style={styles.team}>
-                      <View style={styles.logoCircle}>
-                        <Text style={styles.ball}>⚽</Text>
-                      </View>
+                      <TeamLogo badge={game.away_badge} />
 
                       <Text style={styles.teamName}>
                         {game.away_team}
@@ -431,6 +430,24 @@ export default function PredictionsScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function TeamLogo({ badge }: { badge: string | null }) {
+  return (
+    <View style={styles.logoCircle}>
+      {badge ? (
+        // TheSportsDB serves a 250px version at /small, plenty for a 48px circle
+        <Image
+          source={{ uri: `${badge}/small` }}
+          style={styles.badge}
+          contentFit="contain"
+          transition={150}
+        />
+      ) : (
+        <Text style={styles.ball}>⚽</Text>
+      )}
+    </View>
   );
 }
 
@@ -585,6 +602,11 @@ saveToastText: {
 
   ball: {
     fontSize: 25,
+  },
+
+  badge: {
+    width: 34,
+    height: 34,
   },
 
   teamName: {
