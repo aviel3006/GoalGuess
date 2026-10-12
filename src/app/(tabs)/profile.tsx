@@ -50,6 +50,10 @@ function openEditProfile() {
   router.push('/edit-profile');
 }
 
+function openMyStats() {
+  router.push('/my-stats');
+}
+
 function comingSoon() {
   Alert.alert('בקרוב', 'המסך הזה עדיין בפיתוח');
 }
@@ -156,7 +160,7 @@ export default function ProfileScreen() {
 
           <View style={[styles.card, styles.menuCard]}>
             <MenuRow icon="person" label="עריכת פרופיל" onPress={openEditProfile} />
-            <MenuRow icon="stats-chart" label="הסטטיסטיקות שלי" onPress={comingSoon} />
+            <MenuRow icon="stats-chart" label="הסטטיסטיקות שלי" onPress={openMyStats} />
             <MenuRow icon="settings-sharp" label="הגדרות" onPress={comingSoon} />
             <MenuRow icon="log-out-outline" label="התנתקות" onPress={confirmLogout} danger last />
           </View>
@@ -242,7 +246,12 @@ function StatsCard({ data }: { data: ProfileData }) {
   }
 
   return (
-    <View style={[styles.card, styles.statsCard, styles.statsRow]}>
+    <TouchableOpacity
+      style={[styles.card, styles.statsCard, styles.statsRow]}
+      activeOpacity={0.8}
+      onPress={openMyStats}
+      accessibilityLabel="פתח את הסטטיסטיקות שלי"
+    >
       <StatItem
         icon={<Ionicons name="trophy" size={26} color={GOLD} />}
         value={stats.bestLeagueRank !== null ? String(stats.bestLeagueRank) : '—'}
@@ -267,7 +276,7 @@ function StatsCard({ data }: { data: ProfileData }) {
         value={stats.exactPredictions.toLocaleString()}
         label="ניחושים מדויקים"
       />
-    </View>
+    </TouchableOpacity>
   );
 }
 

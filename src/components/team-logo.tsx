@@ -3,19 +3,21 @@ import { StyleSheet, Text, View } from 'react-native';
 
 export const LOGO_SIZE = 54;
 
-export function TeamLogo({ badge }: { badge: string | null }) {
+export function TeamLogo({ badge, size = LOGO_SIZE }: { badge: string | null; size?: number }) {
+  const badgeSize = Math.round(size * 0.78);
+
   return (
-    <View style={styles.logoCircle}>
+    <View style={[styles.logoCircle, { width: size, height: size, borderRadius: size / 2 }]}>
       {badge ? (
         // TheSportsDB serves a 250px version at /small, plenty for a 54px circle
         <Image
           source={{ uri: `${badge}/small` }}
-          style={styles.badge}
+          style={{ width: badgeSize, height: badgeSize }}
           contentFit="contain"
           transition={150}
         />
       ) : (
-        <Text style={styles.ball}>⚽</Text>
+        <Text style={{ fontSize: Math.round(size * 0.46) }}>⚽</Text>
       )}
     </View>
   );
@@ -23,20 +25,8 @@ export function TeamLogo({ badge }: { badge: string | null }) {
 
 const styles = StyleSheet.create({
   logoCircle: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-    borderRadius: LOGO_SIZE / 2,
     backgroundColor: '#252525',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  ball: {
-    fontSize: 25,
-  },
-
-  badge: {
-    width: 42,
-    height: 42,
   },
 });
