@@ -6,6 +6,7 @@ import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '../hooks/use-session';
+import { confirmDeleteAccount } from '../utils/delete-account';
 import { confirmSignOut } from '../utils/sign-out';
 
 export { ScreenErrorBoundary as ErrorBoundary } from '../components/screen-error';
@@ -82,7 +83,8 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <View style={styles.card}>
-            <Row icon="log-out-outline" label="התנתקות" onPress={confirmSignOut} danger last />
+            <Row icon="log-out-outline" label="התנתקות" onPress={confirmSignOut} danger />
+            <Row icon="trash-outline" label="מחיקת חשבון" onPress={confirmDeleteAccount} danger last />
           </View>
         </View>
       </ScrollView>
