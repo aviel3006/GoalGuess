@@ -38,14 +38,15 @@ export default function SignupScreen() {
       options: { emailRedirectTo: authRedirectUrl },
     });
 
-    if (error) {
-      alert(error.message);
+    // With email confirmation off Supabase reports a taken email as an error;
+    // with it on it hides the account by returning a user with no identities
+    if (error?.code === 'user_already_exists' || data.user?.identities?.length === 0) {
+      alert('האימייל הזה כבר רשום. התחבר במקום להירשם.');
       return;
     }
 
-    // Supabase hides existing accounts by returning a user with no identities and sending no code
-    if (data.user?.identities?.length === 0) {
-      alert('האימייל הזה כבר רשום. התחבר במקום להירשם.');
+    if (error) {
+      alert(error.message);
       return;
     }
 
