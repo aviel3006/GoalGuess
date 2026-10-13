@@ -13,6 +13,18 @@ if (__DEV__) {
   console.log('Auth email links redirect to', authRedirectUrl);
 }
 
+// Auth redirects (email links, Google sign-in) carry the result in the URL fragment:
+// #access_token=...&refresh_token=...&type=signup|recovery, or #error=...&error_description=...
+export function authParamsFromUrl(url: string | null) {
+  const params = new URLSearchParams(url?.split('#')[1] ?? '');
+  return {
+    accessToken: params.get('access_token'),
+    refreshToken: params.get('refresh_token'),
+    type: params.get('type'),
+    error: params.get('error'),
+  };
+}
+
 export type FavoriteTeams = number[] | 'all';
 
 type SessionState = {
@@ -76,16 +88,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Email links land here with the new session in the URL fragment:
-    // #access_token=...&refresh_token=...&type=signup|recovery
+    // Email links land here with the new session in the URL fragment
     const handleUrl = async (url: string | null) => {
-      const params = new URLSearchParams(url?.split('#')[1] ?? '');
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+      const { accessToken, refreshToken, type } = authParamsFromUrl(url);
       if (!accessToken || !refreshToken) return;
 
       // Set before the session arrives so the reset screen opens instead of the app
-      const isRecoveryLink = params.get('type') === 'recovery';
+      const isRecoveryLink = type === 'recovery';
       if (isRecoveryLink) setIsRecovering(true);
 
       const { error } = await supabase.auth.setSession({

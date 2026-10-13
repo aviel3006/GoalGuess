@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import {
     ImageBackground,
@@ -13,11 +14,47 @@ import {
     View,
 } from 'react-native';
 
-import { authRedirectUrl } from '../hooks/use-session';
+import { authParamsFromUrl, authRedirectUrl } from '../hooks/use-session';
 import { supabase } from '../supabase';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+// Google sign-in runs on Supabase's OAuth page in an in-app browser, which redirects back
+// to the app with the session in the URL fragment. A new Google user has no username yet,
+// so the root layout sends them to the username screen next.
+const handleGoogleLogin = async () => {
+  setIsGoogleLoading(true);
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: authRedirectUrl, skipBrowserRedirect: true },
+    });
+    if (error || !data.url) {
+      alert('לא הצלחנו להתחבר עם Google. נסה שוב.');
+      return;
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, authRedirectUrl);
+    if (result.type !== 'success') return;
+
+    const { accessToken, refreshToken, error: authError } = authParamsFromUrl(result.url);
+    if (authError === 'access_denied') return;
+    if (!accessToken || !refreshToken) {
+      alert('לא הצלחנו להתחבר עם Google. נסה שוב.');
+      return;
+    }
+
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (sessionError) alert('לא הצלחנו להתחבר עם Google. נסה שוב.');
+  } finally {
+    setIsGoogleLoading(false);
+  }
+};
 const handleLogin = async () => {
   const { error } = await supabase.auth.signInWithPassword({
     email: email.trim(),
@@ -115,9 +152,15 @@ const handleLogin = async () => {
             <View style={styles.line} />
           </View>
 
-          <TouchableOpacity style={styles.googleButton}>
+          <TouchableOpacity
+            style={[styles.googleButton, isGoogleLoading && styles.googleButtonBusy]}
+            onPress={handleGoogleLogin}
+            disabled={isGoogleLoading}
+          >
             <Text style={styles.googleText}>G</Text>
-            <Text style={styles.socialText}>Continue with Google</Text>
+            <Text style={styles.socialText}>
+              {isGoogleLoading ? 'Connecting…' : 'Continue with Google'}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.signupRow}>
@@ -265,6 +308,10 @@ bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 13,
+  },
+
+  googleButtonBusy: {
+    opacity: 0.6,
   },
 
   googleText: {
