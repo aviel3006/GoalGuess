@@ -8,16 +8,14 @@
  *
  * Extra arguments go to `expo start`. `npm run share` passes --no-dev --minify, so friends
  * testing in Expo Go get the faster production bundle, and prints a link they can tap.
- * It also passes --offline: otherwise the manifest is signed with the logged-in Expo account,
- * and Expo Go on iPhone refuses to open it unless the phone is signed in to that same account.
- * Offline alone still signs with the certificate cached in ~/.expo, so with --offline the CLI
- * also gets an empty home directory, leaving the manifest unsigned and anonymous.
+ * Expo Go on iPhone opens the project only for Expo accounts with access to it, so friends join
+ * the "goalguess" Expo organization as Viewers and sign in to Expo Go. The CLI must stay signed
+ * in (no --offline) so the manifest is signed for that organization.
  */
 
 const { spawn } = require("child_process");
 const fs = require("fs");
 const net = require("net");
-const os = require("os");
 const path = require("path");
 
 const SHARE_PAGE = "https://aviel3006.github.io/GoalGuess/try.html";
@@ -66,14 +64,11 @@ async function main() {
     // docs/try.html turns the tunnel host into an exp:// link that opens Expo Go
     console.log(`קישור לחברים: ${SHARE_PAGE}#${new URL(url[0]).host}`);
     const extraArgs = process.argv.slice(2).join(" ");
-    const anonymousHome = process.argv.includes("--offline")
-      ? { __UNSAFE_EXPO_HOME_DIRECTORY: path.join(os.tmpdir(), "goalguess-expo-share-home") }
-      : {};
     expo = spawn(`npx expo start --port ${port} ${extraArgs}`, {
       stdio: "inherit",
       shell: true,
       // Must be set in the shell: Expo reads it before loading .env
-      env: { ...process.env, ...anonymousHome, EXPO_PACKAGER_PROXY_URL: url[0] },
+      env: { ...process.env, EXPO_PACKAGER_PROXY_URL: url[0] },
     });
     expo.on("exit", (code) => {
       tunnel.kill();
