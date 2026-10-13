@@ -5,12 +5,17 @@
  * the app from any network (the phone doesn't need to be on the home Wi-Fi).
  * Expo's own `--tunnel` relies on a shared ngrok account that is often overloaded.
  * The computer still has to stay on while the app is in use.
+ *
+ * Extra arguments go to `expo start`. `npm run share` passes --no-dev --minify, so friends
+ * testing in Expo Go get the faster production bundle, and prints a link they can tap.
  */
 
 const { spawn } = require("child_process");
 const fs = require("fs");
 const net = require("net");
 const path = require("path");
+
+const SHARE_PAGE = "https://aviel3006.github.io/GoalGuess/try.html";
 
 // An older dev server may still hold 8081; tunnelling to it would serve its LAN-only address
 function findFreePort(port) {
@@ -53,7 +58,10 @@ async function main() {
     if (!url) return;
 
     console.log(`החיבור המרוחק מוכן: ${url[0]}`);
-    expo = spawn(`npx expo start --port ${port}`, {
+    // docs/try.html turns the tunnel host into an exp:// link that opens Expo Go
+    console.log(`קישור לחברים: ${SHARE_PAGE}#${new URL(url[0]).host}`);
+    const extraArgs = process.argv.slice(2).join(" ");
+    expo = spawn(`npx expo start --port ${port} ${extraArgs}`, {
       stdio: "inherit",
       shell: true,
       // Must be set in the shell: Expo reads it before loading .env

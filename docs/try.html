@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>לנסות את GoalGuess</title>
+  <link rel="icon" href="icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700;800&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .steps { list-style: none; padding: 0; margin: 24px 0; display: grid; gap: 16px; }
+    .steps li { border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 18px; }
+    .steps h2 { margin: 0 0 8px; font-size: 1.15rem; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .button { display: inline-block; padding: 12px 18px; border-radius: 12px; font-weight: 800; text-decoration: none; border: 1px solid #16E37A; color: #16E37A; }
+    .button.primary { background: #16E37A; color: #06150D; }
+    .notice { font-size: 0.95rem; opacity: 0.8; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="icon.png" alt="">GoalGuess</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <article>
+      <h1>לנסות את GoalGuess</h1>
+      <p>האפליקציה עוד לא בחנות, אבל אפשר לנסות אותה כבר עכשיו בשני צעדים.</p>
+
+      <ol class="steps">
+        <li>
+          <h2>1. להתקין את Expo Go</h2>
+          <p>אפליקציה חינמית שמריצה אפליקציות שעוד בפיתוח.</p>
+          <div class="buttons">
+            <a class="button" href="https://apps.apple.com/app/expo-go/id982107779">לאייפון</a>
+            <a class="button" href="https://play.google.com/store/apps/details?id=host.exp.exponent">לאנדרואיד</a>
+          </div>
+        </li>
+        <li>
+          <h2>2. לפתוח את GoalGuess</h2>
+          <div id="ready" hidden>
+            <p>אחרי שההתקנה הסתיימה, לוחצים כאן ומאשרים את הפתיחה ב-Expo Go:</p>
+            <div class="buttons">
+              <a class="button primary" id="open">פתח את GoalGuess</a>
+            </div>
+          </div>
+          <p id="broken" hidden>הקישור הזה לא שלם. בקשו קישור חדש ממי ששלח לכם אותו.</p>
+        </li>
+      </ol>
+
+      <p class="notice">נרשמים עם מייל וסיסמה. התחברות עם גוגל לא עובדת בגרסת הניסיון. אם האפליקציה לא נטענת, כנראה שגרסת הניסיון כבויה כרגע. בקשו קישור חדש.</p>
+    </article>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <a href="privacy.html">מדיניות פרטיות</a>
+      <a href="terms.html">תנאי שימוש</a>
+    </div>
+  </footer>
+
+  <script>
+    // The link carries the current tunnel host after the #, e.g. try.html#abc-def.trycloudflare.com
+    var host = location.hash.slice(1);
+    if (/^[a-z0-9-]+\.trycloudflare\.com$/.test(host)) {
+      document.getElementById('open').href = 'exp://' + host;
+      document.getElementById('ready').hidden = false;
+    } else {
+      document.getElementById('broken').hidden = false;
+    }
+  </script>
+</body>
+</html>
