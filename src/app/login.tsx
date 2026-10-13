@@ -1,4 +1,5 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
@@ -25,7 +26,11 @@ export default function LoginScreen() {
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === 'ios') AppleAuthentication.isAvailableAsync().then(setIsAppleAvailable);
+    // In Expo Go Apple signs the token for Expo Go's bundle id, which Supabase doesn't accept
+    const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+    if (Platform.OS === 'ios' && !isExpoGo) {
+      AppleAuthentication.isAvailableAsync().then(setIsAppleAvailable);
+    }
   }, []);
 
 // Google sign-in runs on Supabase's OAuth page in an in-app browser, which redirects back
