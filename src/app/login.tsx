@@ -1,6 +1,7 @@
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ImageBackground,
     KeyboardAvoidingView,
@@ -20,6 +21,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isAppleAvailable, setIsAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') AppleAuthentication.isAvailableAsync().then(setIsAppleAvailable);
+  }, []);
 
 // Google sign-in runs on Supabase's OAuth page in an in-app browser, which redirects back
 // to the app with the session in the URL fragment. A new Google user has no username yet,
@@ -53,6 +59,27 @@ const handleGoogleLogin = async () => {
     if (sessionError) alert('לא הצלחנו להתחבר עם Google. נסה שוב.');
   } finally {
     setIsGoogleLoading(false);
+  }
+};
+// Apple sign-in uses the native iOS sheet and hands its ID token to Supabase. The name Apple
+// shares isn't needed, since a new user picks a username on the next screen like with Google.
+const handleAppleLogin = async () => {
+  try {
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [AppleAuthentication.AppleAuthenticationScope.EMAIL],
+    });
+    if (!credential.identityToken) {
+      alert('לא הצלחנו להתחבר עם Apple. נסה שוב.');
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: 'apple',
+      token: credential.identityToken,
+    });
+    if (error) alert('לא הצלחנו להתחבר עם Apple. נסה שוב.');
+  } catch (e: any) {
+    if (e.code !== 'ERR_REQUEST_CANCELED') alert('לא הצלחנו להתחבר עם Apple. נסה שוב.');
   }
 };
 const handleLogin = async () => {
@@ -162,6 +189,16 @@ const handleLogin = async () => {
               {isGoogleLoading ? 'Connecting…' : 'Continue with Google'}
             </Text>
           </TouchableOpacity>
+
+          {isAppleAvailable && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={17}
+              style={styles.appleButton}
+              onPress={handleAppleLogin}
+            />
+          )}
 
           <View style={styles.signupRow}>
             <Text style={styles.signupText}>{"Don't have an account? "}</Text>
@@ -312,6 +349,11 @@ bottom: 0,
 
   googleButtonBusy: {
     opacity: 0.6,
+  },
+
+  appleButton: {
+    height: 58,
+    marginTop: 12,
   },
 
   googleText: {
