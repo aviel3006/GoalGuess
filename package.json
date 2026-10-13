@@ -40,7 +40,7 @@
   "scripts": {
     "start": "expo start",
     "remote": "node ./scripts/start-remote.js",
-    "share": "node ./scripts/start-remote.js --no-dev --minify",
+    "share": "node ./scripts/start-remote.js --no-dev --minify --offline",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
