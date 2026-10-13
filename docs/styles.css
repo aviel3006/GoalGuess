@@ -1,0 +1,192 @@
+:root {
+  --bg: #04150b;
+  --surface: #0a2416;
+  --line: #1c3d2a;
+  --text: #eef5f0;
+  --muted: #a7b9ae;
+  --neon: #16e37a;
+  --neon-strong: #00c862;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rubik', system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+a {
+  color: var(--neon);
+}
+
+a:hover {
+  color: #7dffba;
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+header.site {
+  border-bottom: 1px solid var(--line);
+}
+
+header.site .wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+}
+
+header.site img {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+}
+
+header.site a.brand {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 20px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hero {
+  text-align: center;
+  padding: 72px 0 48px;
+}
+
+.hero img {
+  width: 132px;
+  height: 132px;
+  border-radius: 30px;
+  box-shadow: 0 18px 50px rgba(22, 227, 122, 0.25);
+}
+
+.hero h1 {
+  font-size: 48px;
+  line-height: 1.15;
+  margin: 28px 0 8px;
+  font-weight: 800;
+}
+
+.hero h1 span {
+  color: var(--neon);
+}
+
+.hero p {
+  color: var(--muted);
+  font-size: 20px;
+  margin: 0 auto;
+  max-width: 480px;
+}
+
+.badge {
+  display: inline-block;
+  margin-top: 28px;
+  padding: 10px 20px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  padding-bottom: 64px;
+}
+
+.feature {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.feature h2 {
+  font-size: 19px;
+  margin: 0 0 6px;
+  color: var(--neon);
+}
+
+.feature p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+article {
+  padding: 48px 0 64px;
+}
+
+article h1 {
+  font-size: 36px;
+  line-height: 1.2;
+  margin: 0 0 6px;
+}
+
+article .updated {
+  color: var(--muted);
+  margin: 0 0 32px;
+}
+
+article h2 {
+  font-size: 22px;
+  margin: 40px 0 8px;
+}
+
+article ul,
+article ol {
+  padding-inline-start: 22px;
+}
+
+article li {
+  margin-bottom: 6px;
+}
+
+.note {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 20px;
+}
+
+footer.site {
+  border-top: 1px solid var(--line);
+  padding: 28px 0 40px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+footer.site .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+@media (max-width: 520px) {
+  .hero h1 {
+    font-size: 38px;
+  }
+
+  article h1 {
+    font-size: 30px;
+  }
+}
