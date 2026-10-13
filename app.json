@@ -8,7 +8,11 @@
     "scheme": "goalguess",
     "userInterfaceStyle": "dark",
     "ios": {
-      "bundleIdentifier": "com.goalguess.app"
+      "bundleIdentifier": "com.goalguess.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.goalguess.app",
@@ -33,11 +37,26 @@
           "imageWidth": 160
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GoalGuess צריכה גישה לתמונות שלך כדי שתוכל לבחור תמונת פרופיל ותמונה לליגה.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c4c2fb7a-3e32-4335-b177-c9dd7cb439da"
+      }
+    },
+    "owner": "avielmas"
   }
 }
