@@ -17,8 +17,9 @@
     "android": {
       "package": "com.goalguess.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0C2618",
+        "backgroundColor": "#16E37A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
