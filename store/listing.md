@@ -8,6 +8,7 @@
 |---|---|
 | Privacy Policy URL | https://aviel3006.github.io/GoalGuess/privacy.html |
 | Support URL / Website | https://aviel3006.github.io/GoalGuess/ |
+| Terms of use | https://aviel3006.github.io/GoalGuess/terms.html |
 | Account deletion URL (גוגל) | https://aviel3006.github.io/GoalGuess/delete-account.html |
 | מייל ליצירת קשר | goalguess@outlook.com |
 | קטגוריה | Sports |
@@ -102,6 +103,21 @@ GoalGuess היא הדרך הכי כיפית לעקוב אחרי ליגת העל:
 **שאר הטפסים באפל:**
 - **Age rating:** אין אלימות, תוכן מיני, הימורים או קניות. "User-generated content": כן. הדירוג שיצא כנראה יהיה 12+ או 13+, וזה מתאים למדיניות שלנו.
 - **Sign-in required:** כן. לבודקים של אפל צריך לתת חשבון לדוגמה (מייל וסיסמה) בשדה "App Review Information". נפתח חשבון כזה לפני ההגשה.
+- **License Agreement:** להשאיר את ברירת המחדל של אפל. תנאי השימוש שלנו מקושרים מתוך האפליקציה.
+- **Notes** בשדה "App Review Information" (באנגלית, כי הבודקים קוראים אנגלית):
+
+```
+GoalGuess is a free football score-prediction game. There is no gambling, no money and no prizes.
+
+User-generated content (usernames, profile pictures, league names and pictures):
+- Offensive usernames and league names are filtered on the server.
+- Tap any other player's row in the Leaderboard tab (or inside a league) to report or block them.
+- Inside a league, the flag icon at the top reports the league.
+- Blocked users can be managed in Settings > Blocked users.
+- Reports are reviewed within 24 hours. Terms of use with a zero-tolerance policy are linked on the sign-in screen and in Settings.
+
+Account deletion: Settings > Delete account.
+```
 - **Export compliance:** כבר מוגדר באפליקציה (אין הצפנה מיוחדת), אז אפל לא תשאל.
 
 ## גוגל פליי – בדיקה סגורה (חשבון פרטי חדש)

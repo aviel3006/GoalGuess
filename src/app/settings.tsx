@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '../hooks/use-session';
 import { confirmDeleteAccount } from '../utils/delete-account';
 import { confirmSignOut } from '../utils/sign-out';
+import { openPrivacyPolicy, openTerms } from '../utils/site';
 
 export { ScreenErrorBoundary as ErrorBoundary } from '../components/screen-error';
 
@@ -76,8 +77,14 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        <Section title="פרטיות">
+          <Row icon="ban" label="משתמשים חסומים" onPress={open('/blocked-users')} last />
+        </Section>
+
         <Section title="מידע">
           <Row icon="book" label="חוקי המשחק" onPress={open('/rules')} />
+          <Row icon="document-text" label="תנאי שימוש" onPress={openTerms} />
+          <Row icon="shield-checkmark" label="מדיניות פרטיות" onPress={openPrivacyPolicy} />
           <Row icon="information-circle" label="גרסה" value={version} last />
         </Section>
 

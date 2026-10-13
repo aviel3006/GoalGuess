@@ -107,6 +107,10 @@ const createLeague = async () => {
       ({ data, error } = await insertLeague(inviteCode));
     }
 
+    if (error?.message.includes('inappropriate_league_name')) {
+      Alert.alert('השם לא מתאים', 'שם הליגה הזה לא מתאים. בחר שם אחר.');
+      return;
+    }
     if (error) throw error;
 
     setCreatedLeagueId(data?.id ?? null);

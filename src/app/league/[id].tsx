@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ModerationSheet, type ModerationTarget } from '../../components/moderation-sheet';
 import { PlayerAvatar } from '../../components/player-avatar';
 import { supabase } from '../../supabase';
 
@@ -40,12 +41,16 @@ type Standing = {
   is_me: boolean;
   is_owner: boolean;
   avatar_url: string | null;
+  user_id: string;
+  // Blocked players come back without name and picture
+  is_blocked: boolean;
 };
 
 type LoadState = 'loading' | 'error' | 'ready';
 
 function standingName(entry: Standing) {
   if (entry.is_me) return 'אתה';
+  if (entry.is_blocked) return 'משתמש חסום';
   return entry.display_name ?? 'שחקן';
 }
 
@@ -56,6 +61,7 @@ export default function LeagueScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [league, setLeague] = useState<League | null>(null);
   const [standings, setStandings] = useState<Standing[]>([]);
+  const [moderationTarget, setModerationTarget] = useState<ModerationTarget | null>(null);
 
   const load = useCallback(async () => {
     // RLS returns the league only to its members
@@ -103,6 +109,16 @@ export default function LeagueScreen() {
     });
   };
 
+  // Another player's row opens report / block
+  const openPlayer = (entry: Standing) => {
+    setModerationTarget({
+      kind: 'player',
+      userId: entry.user_id,
+      name: standingName(entry),
+      isBlocked: entry.is_blocked,
+    });
+  };
+
   // Before the first graded match everyone is tied at 0, so ranks are hidden
   const hasScores = standings.some((entry) => entry.points > 0);
 
@@ -126,7 +142,17 @@ export default function LeagueScreen() {
           GOAL<Text style={styles.logoGreen}>GUESS</Text>
         </Text>
 
-        <View style={styles.topBarSpace} />
+        {league ? (
+          <TouchableOpacity
+            onPress={() => setModerationTarget({ kind: 'league', leagueId: league.id, name: league.name })}
+            hitSlop={10}
+            accessibilityLabel="דיווח על הליגה"
+          >
+            <Ionicons name="flag-outline" size={22} color="#C9D4CE" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.topBarSpace} />
+        )}
       </View>
 
       {loadState === 'loading' && (
@@ -204,7 +230,12 @@ export default function LeagueScreen() {
             </View>
 
             {standings.map((entry, index) => (
-              <StandingRow key={index} entry={entry} showRank={hasScores} />
+              <StandingRow
+                key={index}
+                entry={entry}
+                showRank={hasScores}
+                onPress={entry.is_me ? undefined : () => openPlayer(entry)}
+              />
             ))}
           </View>
 
@@ -217,15 +248,37 @@ export default function LeagueScreen() {
           )}
         </ScrollView>
       )}
+
+      {moderationTarget && (
+        <ModerationSheet
+          key={moderationTarget.kind === 'player' ? moderationTarget.userId : 'league'}
+          target={moderationTarget}
+          onClose={() => setModerationTarget(null)}
+          onChanged={load}
+        />
+      )}
     </View>
   );
 }
 
-function StandingRow({ entry, showRank }: { entry: Standing; showRank: boolean }) {
+function StandingRow({
+  entry,
+  showRank,
+  onPress,
+}: {
+  entry: Standing;
+  showRank: boolean;
+  onPress?: () => void;
+}) {
   const medalColor = showRank && entry.rank <= 3 ? MEDAL_COLORS[entry.rank - 1] : null;
 
   return (
-    <View style={[styles.row, entry.is_me && styles.myRow]}>
+    <TouchableOpacity
+      style={[styles.row, entry.is_me && styles.myRow]}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.rankColumn}>
         {medalColor ? (
           <Ionicons name="trophy" size={18} color={medalColor} style={styles.rankCell} />
@@ -244,7 +297,7 @@ function StandingRow({ entry, showRank }: { entry: Standing; showRank: boolean }
 
       <Text style={[styles.rowExact, styles.exactColumn]}>{entry.exact_count}</Text>
       <Text style={[styles.rowPoints, styles.pointsColumn]}>{entry.points.toLocaleString()}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 

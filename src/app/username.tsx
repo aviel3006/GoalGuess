@@ -35,8 +35,13 @@ export default function UsernameScreen() {
     setIsSaving(true);
     try {
       // The leaderboards read the name from public.usernames, which keeps it unique
-      if ((await claimUsername(name)) === 'taken') {
+      const claim = await claimUsername(name);
+      if (claim === 'taken') {
         alert('מישהו כבר בחר את שם המשתמש הזה. נסה שם אחר.');
+        return;
+      }
+      if (claim === 'inappropriate') {
+        alert('השם הזה לא מתאים. בחר שם אחר.');
         return;
       }
 

@@ -158,9 +158,16 @@ export default function EditProfileScreen() {
     setIsSaving(true);
     try {
       // Reserve a new name first, so a taken name doesn't cost an avatar upload
-      if (cleanUsername !== initialUsername && (await claimUsername(cleanUsername)) === 'taken') {
-        Alert.alert('השם תפוס', 'מישהו כבר בחר את שם המשתמש הזה. נסה שם אחר.');
-        return;
+      if (cleanUsername !== initialUsername) {
+        const claim = await claimUsername(cleanUsername);
+        if (claim === 'taken') {
+          Alert.alert('השם תפוס', 'מישהו כבר בחר את שם המשתמש הזה. נסה שם אחר.');
+          return;
+        }
+        if (claim === 'inappropriate') {
+          Alert.alert('השם לא מתאים', 'השם הזה לא מתאים. בחר שם אחר.');
+          return;
+        }
       }
 
       let avatarUrl = currentAvatarUrl;

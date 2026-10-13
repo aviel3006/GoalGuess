@@ -9,10 +9,12 @@ export function cleanName(value: string) {
 }
 
 // Reserves the name in public.usernames, which the leaderboards read and which is unique
-// ignoring case. Call it before saving the name to user_metadata.
-export async function claimUsername(name: string): Promise<'claimed' | 'taken'> {
+// ignoring case. Call it before saving the name to user_metadata. The database also refuses
+// offensive names (public.blocked_words).
+export async function claimUsername(name: string): Promise<'claimed' | 'taken' | 'inappropriate'> {
   const { error } = await supabase.rpc('claim_username', { p_username: name });
   if (error?.message.includes('username_taken')) return 'taken';
+  if (error?.message.includes('inappropriate_username')) return 'inappropriate';
   if (error) throw error;
   return 'claimed';
 }

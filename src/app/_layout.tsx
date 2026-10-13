@@ -40,6 +40,7 @@ function RootNavigator() {
         <Stack.Screen name="my-stats" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="change-password" />
+        <Stack.Screen name="blocked-users" />
       </Stack.Protected>
 
       {/* Has a username but hasn't picked leagues for the world tables yet */}

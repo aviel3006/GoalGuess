@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ModerationSheet, type ModerationTarget } from '../../components/moderation-sheet';
 import { PlayerAvatar } from '../../components/player-avatar';
 import { supabase } from '../../supabase';
 const GREEN = '#00E676';
@@ -31,12 +32,16 @@ type LeaderboardEntry = {
   exact_count: number;
   is_me: boolean;
   avatar_url: string | null;
+  user_id: string;
+  // Blocked players come back without name and picture
+  is_blocked: boolean;
 };
 
 const LEADERBOARD_SIZE = 50;
 
 function entryName(entry: LeaderboardEntry) {
   if (entry.is_me) return 'אתה';
+  if (entry.is_blocked) return 'משתמש חסום';
   return entry.display_name ?? 'שחקן';
 }
 
@@ -58,6 +63,7 @@ const [joinVisible, setJoinVisible] = useState(false);
 const [joinCode, setJoinCode] = useState('');
 const [isJoining, setIsJoining] = useState(false);
 const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+const [moderationTarget, setModerationTarget] = useState<ModerationTarget | null>(null);
 
   const loadLeaderboard = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_global_leaderboard', {
@@ -162,6 +168,17 @@ const me = leaderboard?.find((entry) => entry.is_me) ?? null;
 // Before the first graded match everyone is tied at 0, so ranks and the podium are hidden
 const hasScores = topPlayers.some((entry) => entry.points > 0);
 
+// Another player's row opens report / block
+const openPlayer = (entry: LeaderboardEntry) => {
+  if (entry.is_me) return;
+  setModerationTarget({
+    kind: 'player',
+    userId: entry.user_id,
+    name: entryName(entry),
+    isBlocked: entry.is_blocked,
+  });
+};
+
 const shareInvite = (league: { name: string; invite_code: string }) => {
   Share.share({
     message: `הצטרפו לליגה "${league.name}" ב-GoalGuess עם הקוד: ${league.invite_code}`,
@@ -249,15 +266,18 @@ const shareInvite = (league: { name: string; invite_code: string }) => {
               <PodiumPlayer
                 player={topPlayers[1]}
                 color="#C0C0C0"
+                onPress={openPlayer}
               />
               <PodiumPlayer
                 player={topPlayers[0]}
                 color="#FFD54F"
                 first
+                onPress={openPlayer}
               />
               <PodiumPlayer
                 player={topPlayers[2]}
                 color="#CD8B52"
+                onPress={openPlayer}
               />
             </View>
             )}
@@ -283,6 +303,7 @@ const shareInvite = (league: { name: string; invite_code: string }) => {
                   exact={player.exact_count}
                   points={player.points}
                   highlighted={player.is_me}
+                  onPress={player.is_me ? undefined : () => openPlayer(player)}
                 />
               ))}
             </View>
@@ -464,7 +485,14 @@ paddingHorizontal: 18,
         </KeyboardAvoidingView>
       </Modal>
 
-      
+      {moderationTarget && (
+        <ModerationSheet
+          key={moderationTarget.kind === 'player' ? moderationTarget.userId : moderationTarget.leagueId}
+          target={moderationTarget}
+          onClose={() => setModerationTarget(null)}
+          onChanged={loadLeaderboard}
+        />
+      )}
     </ImageBackground>
   );
 }
@@ -473,19 +501,25 @@ function PodiumPlayer({
   player,
   color,
   first = false,
+  onPress,
 }: {
   // undefined while fewer than three players have scored
   player: LeaderboardEntry | undefined;
   color: string;
   first?: boolean;
+  onPress: (player: LeaderboardEntry) => void;
 }) {
   if (!player) {
     return <View style={[styles.podiumPlayer, styles.podiumEmpty, first && styles.firstPlayer]} />;
   }
 
   return (
-    
-<View style={[styles.podiumPlayer, first && styles.firstPlayer]}>
+    <TouchableOpacity
+      style={[styles.podiumPlayer, first && styles.firstPlayer]}
+      onPress={() => onPress(player)}
+      disabled={player.is_me}
+      activeOpacity={0.7}
+    >
 
       <Ionicons
         name="trophy"
@@ -523,7 +557,7 @@ function PodiumPlayer({
       <Text style={styles.podiumExact}>
         {player.exact_count} דיוקים
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -553,6 +587,7 @@ function PlayerRow({
   exact,
   points,
   highlighted = false,
+  onPress,
 }: {
   rank: number | null;
   name: string;
@@ -560,13 +595,17 @@ function PlayerRow({
   exact: number;
   points: number;
   highlighted?: boolean;
+  onPress?: () => void;
 }) {
   return (
-    <View
+    <TouchableOpacity
       style={[
         styles.playerRow,
         highlighted && styles.highlightedRow,
       ]}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={0.7}
     >
       <Text style={[styles.rowRank, styles.rankColumn]}>
         {rank ?? '–'}
@@ -589,7 +628,7 @@ function PlayerRow({
       <Text style={[styles.rowPoints, styles.pointsColumn]}>
         {points.toLocaleString()}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 

@@ -13,6 +13,7 @@ import {
     View,
 } from 'react-native';
 
+import { TermsNotice } from '../components/terms-notice';
 import { authRedirectUrl } from '../hooks/use-session';
 import { supabase } from '../supabase';
 
@@ -142,6 +143,8 @@ export default function SignupScreen() {
               <Text style={styles.loginLink}>Log In</Text>
             </TouchableOpacity>
           </View>
+
+          <TermsNotice />
         </View>
             </ScrollView>
   </KeyboardAvoidingView>
