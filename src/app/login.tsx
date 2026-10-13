@@ -35,7 +35,11 @@ const handleLogin = async () => {
       router.push({ pathname: '/verify', params: { email: email.trim() } });
       return;
     }
-    alert(error.message);
+    alert(
+      error.code === 'invalid_credentials'
+        ? 'האימייל או הסיסמה לא נכונים. אם שכחת את הסיסמה, לחץ על Forgot Password.'
+        : error.message
+    );
     return;
   }
 
