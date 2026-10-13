@@ -60,6 +60,12 @@
         "projectId": "c4c2fb7a-3e32-4335-b177-c9dd7cb439da"
       }
     },
-    "owner": "goalguess"
+    "owner": "goalguess",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c4c2fb7a-3e32-4335-b177-c9dd7cb439da"
+    }
   }
 }

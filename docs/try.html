@@ -54,7 +54,7 @@
         </li>
       </ol>
 
-      <p class="notice">נרשמים עם מייל וסיסמה. התחברות עם גוגל לא עובדת בגרסת הניסיון. אם האפליקציה לא נטענת, כנראה שגרסת הניסיון כבויה כרגע. בקשו קישור חדש.</p>
+      <p class="notice">נרשמים עם מייל וסיסמה. התחברות עם גוגל לא עובדת בגרסת הניסיון. אם מופיעה הודעת שגיאה, סגרו את Expo Go לגמרי ונסו שוב.</p>
     </article>
   </main>
 
@@ -66,9 +66,17 @@
   </footer>
 
   <script>
-    // The link carries the current tunnel host after the #, e.g. try.html#abc-def.trycloudflare.com
+    // Without a # the page opens the latest update on the "friends" channel
+    // (published by scripts/publish-friends.js). A dev server tunnel host can be passed after
+    // the #, e.g. try.html#abc-def.trycloudflare.com, but on iPhone that only opens for the
+    // Expo account running the server.
+    var FRIENDS_UPDATE =
+      'exp://u.expo.dev/c4c2fb7a-3e32-4335-b177-c9dd7cb439da?runtime-version=exposdk%3A57.0.0&channel-name=friends';
     var host = location.hash.slice(1);
-    if (/^[a-z0-9-]+\.trycloudflare\.com$/.test(host)) {
+    if (!host) {
+      document.getElementById('open').href = FRIENDS_UPDATE;
+      document.getElementById('ready').hidden = false;
+    } else if (/^[a-z0-9-]+\.trycloudflare\.com$/.test(host)) {
       document.getElementById('open').href = 'exp://' + host;
       document.getElementById('ready').hidden = false;
     } else {
