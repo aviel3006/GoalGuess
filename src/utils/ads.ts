@@ -20,15 +20,16 @@ export const adsSupported =
 // to false.
 export const USE_TEST_ADS = true;
 
-// TODO: paste the real AdMob ad unit IDs here (AdMob > Ad units), then set
-// USE_TEST_ADS = false. Each platform has its own unit id.
+// Real AdMob ad unit IDs. Android is set; iOS still uses placeholders until
+// the iOS app is created in AdMob. Flip USE_TEST_ADS to false only once the
+// app is published and the AdMob account is approved.
 const REAL_BANNER_UNIT_ID = Platform.select({
-  ios: 'ca-app-pub-0000000000000000/0000000000',
-  android: 'ca-app-pub-0000000000000000/0000000000',
+  ios: 'ca-app-pub-0000000000000000/0000000000', // TODO: iOS banner unit id
+  android: 'ca-app-pub-9084340459613767/6633786484',
 });
 const REAL_INTERSTITIAL_UNIT_ID = Platform.select({
-  ios: 'ca-app-pub-0000000000000000/0000000000',
-  android: 'ca-app-pub-0000000000000000/0000000000',
+  ios: 'ca-app-pub-0000000000000000/0000000000', // TODO: iOS interstitial unit id
+  android: 'ca-app-pub-9084340459613767/3185496064',
 });
 
 // The native module is required lazily so a plain `import` never crashes in
