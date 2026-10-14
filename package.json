@@ -44,6 +44,8 @@
     "share": "node ./scripts/start-remote.js --no-dev --minify",
     "publish-friends": "node ./scripts/publish-friends.js",
     "reset-project": "node ./scripts/reset-project.js",
+    "audit:security": "node ./scripts/security-audit.mjs",
+    "test:flow": "node ./scripts/app-flow-test.mjs",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
