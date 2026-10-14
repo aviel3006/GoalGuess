@@ -51,3 +51,9 @@ web-build/
 *.pem
 *.p12
 *.key
+
+# local-only test scripts (kept off the repo)
+scripts/security-audit.mjs
+scripts/app-flow-test.mjs
+scripts/lib/
+scripts/TESTING.md
