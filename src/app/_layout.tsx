@@ -1,7 +1,9 @@
 import { SplashScreen, Stack } from 'expo-router';
+import { useEffect } from 'react';
 
 import { AchievementCelebrationProvider } from '../components/achievement-celebration';
 import { SessionProvider, useSession } from '../hooks/use-session';
+import { initializeAds } from '../utils/ads';
 
 // If anything below throws, show a retry screen instead of crashing the app
 export { RootErrorBoundary as ErrorBoundary } from '../components/screen-error';
@@ -69,6 +71,11 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // Start the ads SDK once (asks for tracking permission on iOS). No-ops in Expo Go.
+  useEffect(() => {
+    initializeAds();
+  }, []);
+
   return (
     <SessionProvider>
       <AchievementCelebrationProvider>

@@ -13,6 +13,7 @@ import {
 
 import { useAchievementCelebration } from '../components/achievement-celebration';
 import { LOGO_SIZE, TeamLogo } from '../components/team-logo';
+import { useInterstitial } from '../hooks/use-interstitial';
 import { supabase } from '../supabase';
 import { currentSeasonMatches, getRoundDeadlines, isMatchOpen } from '../utils/round-deadline';
 
@@ -82,6 +83,7 @@ export default function PredictionsScreen() {
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { check: checkAchievements } = useAchievementCelebration();
+  const showInterstitial = useInterstitial();
   const [showSaveMessage, setShowSaveMessage] = useState(false);
 
   const load = useCallback(async () => {
@@ -229,6 +231,9 @@ export default function PredictionsScreen() {
 
       // e.g. "first prediction" or "50 predictions"
       checkAchievements();
+
+      // Show a full-screen ad after the save is confirmed (no-op in Expo Go).
+      setTimeout(() => showInterstitial(), 2200);
     } catch (error) {
       console.error('Save predictions error:', error);
       Alert.alert('שגיאה', 'הייתה בעיה בשמירת הניחושים. נסה שוב.');

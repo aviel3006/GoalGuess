@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
+import AdBanner from '../../components/ad-banner';
 import BottomNav from '../../components/BottomNav';
 export default function TabsLayout() {
   return (
@@ -9,6 +10,7 @@ export default function TabsLayout() {
     backBehavior="history"
     tabBar={() => (
   <View style={{ backgroundColor: '#000000', paddingBottom: 6 }}>
+    <AdBanner />
     <BottomNav />
   </View>
 )}

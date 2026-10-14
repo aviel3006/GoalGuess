@@ -48,6 +48,19 @@
           "cameraPermission": false,
           "microphonePermission": false
         }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "המזהה הזה ישמש להצגת פרסומות מותאמות עבורך, כדי שנוכל להמשיך להציע את האפליקציה בחינם."
+        }
       ]
     ],
     "experiments": {

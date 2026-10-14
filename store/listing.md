@@ -46,7 +46,7 @@ GoalGuess היא הדרך הכי כיפית לעקוב אחרי ליגת העל:
 • פותחים הישגים לאורך העונה.
 • עוקבים אחרי הסטטיסטיקות האישיות: כמה ניחושים מדויקים, כמה נקודות ובאיזה מקום אתם.
 
-בלי פרסומות ובלי הימורים. רק כדורגל, ניחושים וזכויות התרברבות.
+בלי הימורים ובלי תשלומים. רק כדורגל, ניחושים וזכויות התרברבות.
 ```
 
 ## צילומי מסך
@@ -61,7 +61,7 @@ GoalGuess היא הדרך הכי כיפית לעקוב אחרי ליגת העל:
 **Is all of the user data collected by your app encrypted in transit?** Yes
 **Do you provide a way for users to request that their data is deleted?** Yes (בתוך האפליקציה, וגם בקישור למחיקת חשבון)
 
-שום מידע לא מסומן כ-"Shared": גוגל לא מחשיבה ספק שמאחסן מידע עבורנו (Supabase) כשיתוף.
+רוב המידע לא מסומן כ-"Shared" (גוגל לא מחשיבה ספק אחסון כמו Supabase כשיתוף). **היוצא מן הכלל: מזהה המכשיר/פרסום — נאסף וגם מסומן כ-Shared, כי הוא נשלח לגוגל AdMob לצורך הפרסומות.**
 
 | קטגוריה | סוג מידע | Collected | חובה או לבחירת המשתמש | למה |
 |---|---|---|---|---|
@@ -71,11 +71,12 @@ GoalGuess היא הדרך הכי כיפית לעקוב אחרי ליגת העל:
 | Personal info | Other info (מדינה) | ✔ | לבחירת המשתמש | App functionality |
 | Photos and videos | Photos | ✔ | לבחירת המשתמש | App functionality |
 | App activity | Other user-generated content (ניחושים, ליגות) | ✔ | חובה | App functionality |
+| Device or other IDs | Device or advertising ID | ✔ (גם Shared) | חובה | Advertising or marketing (AdMob) |
 
-לא לסמן: מיקום, אנשי קשר, נתוני כספים, אנליטיקס, קריסות, מזהי מכשיר.
+לא לסמן: מיקום, אנשי קשר, נתוני כספים, קריסות.
 
 **שאר הטפסים בגוגל:**
-- **Ads:** No, my app does not contain ads.
+- **Ads:** Yes, my app contains ads (Google AdMob — banner + interstitial).
 - **Target audience:** 13–15, 16–17, 18 ומעלה. לא לבחור גילים מתחת ל-13, אחרת חלים כללים מחמירים של אפליקציות לילדים.
 - **Content rating:** קטגוריה "All other app types". שאלה על אינטראקציה בין משתמשים: כן (משתמשים רואים שמות ותמונות זה של זה). הימורים: לא, אין כסף ואין פרסים.
 - **News app:** No (יש חדשות, אבל זו לא אפליקציית חדשות).
@@ -85,7 +86,7 @@ GoalGuess היא הדרך הכי כיפית לעקוב אחרי ליגת העל:
 
 **Do you or your third-party partners collect data from this app?** Yes
 
-בכל סוג מידע למטה, התשובות הן:
+בסוגי המידע הבאים התשובות הן:
 - Used for: **App Functionality** בלבד
 - Linked to the user's identity: **Yes**
 - Used for tracking: **No**
@@ -98,7 +99,16 @@ GoalGuess היא הדרך הכי כיפית לעקוב אחרי ליגת העל:
 | User Content | Other User Content (ניחושים, שמות ותמונות של ליגות) |
 | Identifiers | User ID |
 
-לא לסמן: Location, Contacts, Usage Data, Diagnostics, Purchases, Browsing History.
+**בנוסף, בגלל הפרסומות (AdMob)** צריך להוסיף סוג מידע נפרד עם תשובות שונות:
+
+| קטגוריה | סוג מידע | Used for | Linked to identity | Used for tracking |
+|---|---|---|---|---|
+| Identifiers | Device ID | Third-Party Advertising | No | **Yes** |
+
+- כשמסמנים "Used for tracking: Yes" אפל דורשת שהאפליקציה תבקש אישור מעקב מהמשתמש — זה כבר בנוי (חלון ה-ATT מופיע בהפעלה הראשונה).
+- אם AdMob יוגדר לפרסומות לא-מותאמות בלבד, אפשר יהיה לסמן tracking: No; כרגע ההנחה היא פרסומות מותאמות.
+
+לא לסמן: Location, Contacts, Diagnostics, Purchases, Browsing History.
 
 **שאר הטפסים באפל:**
 - **Age rating:** אין אלימות, תוכן מיני, הימורים או קניות. "User-generated content": כן. הדירוג שיצא כנראה יהיה 12+ או 13+, וזה מתאים למדיניות שלנו.
@@ -128,3 +138,19 @@ Account deletion: Settings > Delete account.
 4. להעלות את קובץ ה-AAB שאני בונה ולשלוח לבדיקה של גוגל.
 5. אחרי שגוגל מאשרת, לשלוח לבודקים את קישור ההצטרפות. כל אחד חייב ללחוץ "Become a tester" ולהתקין מהחנות.
 6. אחרי 14 ימים ברצף עם 12 בודקים לפחות: Dashboard → Apply for production. גוגל שואלת כמה שאלות על הבדיקה, ואחר כך מאשרת פרסום לכולם.
+
+## פרסומות – AdMob (הקמה)
+
+האפליקציה כבר מחווטת לפרסומות של Google AdMob: באנר קבוע בתחתית ופרסומת מסך מלא אחרי שמירת ניחושים. **כרגע מוצגות פרסומות בדיקה של גוגל** (`USE_TEST_ADS = true` בקובץ `src/utils/ads.ts`), כדי שלא נלחץ על פרסומות אמיתיות שלנו — זה אסור לפי חוקי AdMob ועלול לחסום את החשבון.
+
+מה שנשאר לעשות כדי להרוויח מפרסומות אמיתיות:
+
+1. לפתוח חשבון חינם ב-https://admob.google.com (אפשר עם אותו חשבון גוגל).
+2. ליצור שתי אפליקציות ב-AdMob — אחת ל-Android ואחת ל-iOS (או אחת בינתיים, לפי מה שמשחררים קודם).
+3. בכל אפליקציה: להעתיק את **App ID** (נראה כמו `ca-app-pub-XXXX~YYYY`) ולשים אותו ב-`app.json`, בתוסף `react-native-google-mobile-ads`, בשדות `androidAppId` / `iosAppId` (כרגע שם מזהי דוגמה של גוגל).
+4. ליצור ב-AdMob יחידות פרסום (Ad units): אחת מסוג Banner ואחת מסוג Interstitial, לכל פלטפורמה. להעתיק את ה-**Ad unit ID** של כל אחת (נראה כמו `ca-app-pub-XXXX/ZZZZ`).
+5. להדביק את המזהים האלה ב-`src/utils/ads.ts` (בשדות `REAL_BANNER_UNIT_ID` ו-`REAL_INTERSTITIAL_UNIT_ID`), ואז לשנות `USE_TEST_ADS` ל-`false`.
+6. בטופס של AdMob על הפרטיות: לבחור אם הפרסומות מותאמות אישית (ברירת המחדל) או לא. זה משפיע על טופס המעקב (ATT) של אפל — ראו הערות למעלה.
+7. לבנות מחדש את האפליקציה (בנייה חדשה ב-EAS), כי פרסומות דורשות קוד שרץ ברמת המכשיר.
+
+> חשוב: אחרי שמחליפים את מזהי הדוגמה במזהים אמיתיים, אסור ללחוץ על הפרסומות באפליקציה שלכם עצמכם — גוגל חוסמת על זה חשבונות. לבדיקות משאירים `USE_TEST_ADS = true`.
