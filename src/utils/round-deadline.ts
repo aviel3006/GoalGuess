@@ -2,6 +2,15 @@
 // Mirrors check_prediction_deadline() in the database.
 export const ROUND_LOCK_MS = 5 * 60 * 1000;
 
+// 14 teams: 26 regular-season rounds, then the top six play 10 more and the bottom
+// eight 7 more. Mirrors LAST_ROUND in the sync-matches edge function.
+export const SEASON_ROUNDS = 36;
+
+// Games expected in a round whose fixtures aren't published yet
+export function expectedMatchCount(round: number) {
+  return round <= 33 ? 7 : 3;
+}
+
 type RoundMatch = {
   round: number;
   kickoff_time: string;

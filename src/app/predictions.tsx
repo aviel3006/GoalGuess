@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,13 @@ import { useAchievementCelebration } from '../components/achievement-celebration
 import { LOGO_SIZE, TeamLogo } from '../components/team-logo';
 import { useInterstitial } from '../hooks/use-interstitial';
 import { supabase } from '../supabase';
-import { currentSeasonMatches, getRoundDeadlines, isMatchOpen } from '../utils/round-deadline';
+import {
+  currentSeasonMatches,
+  expectedMatchCount,
+  getRoundDeadlines,
+  isMatchOpen,
+  SEASON_ROUNDS,
+} from '../utils/round-deadline';
 
 type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled';
 
@@ -57,6 +63,9 @@ const STATUS_LABEL: Partial<Record<MatchStatus, string>> = {
 
 // The logo sits in a slot as tall as the score area so its center lines up with the score digits
 const SCORE_BOX_HEIGHT = 116;
+
+const ROUND_TAB_WIDTH = 115;
+const ROUND_TABS_PADDING = 5;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -119,7 +128,7 @@ export default function PredictionsScreen() {
     setSaved(loadedSaved);
     const loadedDeadlines = getRoundDeadlines(loadedMatches);
     setSelectedRound((current) => {
-      if (current !== null && loadedMatches.some((m) => m.round === current)) return current;
+      if (current !== null && loadedMatches.length > 0) return current;
       // Default to the round of the next match that can still be predicted
       return (
         loadedMatches.find((m) => isMatchOpen(m, loadedDeadlines))?.round ??
@@ -135,10 +144,25 @@ export default function PredictionsScreen() {
     }, [load])
   );
 
-  const rounds = useMemo(
-    () => [...new Set(matches.map((m) => m.round))].sort((a, b) => b - a),
-    [matches]
-  );
+  // Every round of the season, including ones whose fixtures aren't published yet
+  const rounds = useMemo(() => {
+    if (matches.length === 0) return [];
+    const last = Math.max(SEASON_ROUNDS, ...matches.map((m) => m.round));
+    return Array.from({ length: last }, (_, i) => last - i);
+  }, [matches]);
+
+  // Bring the selected round into view, since it can sit far along the tab strip
+  const roundTabsRef = useRef<ScrollView>(null);
+  const [roundTabsWidth, setRoundTabsWidth] = useState(0);
+  const scrolledToRound = useRef(false);
+  useEffect(() => {
+    if (scrolledToRound.current || roundTabsWidth === 0 || selectedRound === null) return;
+    const index = rounds.indexOf(selectedRound);
+    if (index === -1) return;
+    const tabCenter = ROUND_TABS_PADDING + index * ROUND_TAB_WIDTH + ROUND_TAB_WIDTH / 2;
+    roundTabsRef.current?.scrollTo({ x: Math.max(0, tabCenter - roundTabsWidth / 2), animated: false });
+    scrolledToRound.current = true;
+  }, [rounds, selectedRound, roundTabsWidth]);
 
   const deadlines = useMemo(() => getRoundDeadlines(matches), [matches]);
   const isOpen = useCallback((match: Match) => isMatchOpen(match, deadlines), [deadlines]);
@@ -289,9 +313,11 @@ export default function PredictionsScreen() {
         {loadState === 'ready' && rounds.length > 0 && (
           <>
             <ScrollView
+              ref={roundTabsRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.roundTabs}
+              onLayout={(e) => setRoundTabsWidth(e.nativeEvent.layout.width)}
             >
               {rounds.map((round) => (
                 <TouchableOpacity
@@ -312,7 +338,38 @@ export default function PredictionsScreen() {
               ))}
             </ScrollView>
 
-            <Text style={styles.dateTitle}>{dateRange}</Text>
+            <Text style={styles.dateTitle}>{dateRange || '?'}</Text>
+            {roundMatches.length === 0 && selectedRound !== null && (
+              <>
+                <Text style={styles.instructions}>
+                  המשחקים של המחזור הזה עוד לא נקבעו
+                </Text>
+                {Array.from({ length: expectedMatchCount(selectedRound) }, (_, i) => (
+                  <View key={i} style={styles.gameCard}>
+                    <Text style={styles.gameDate}>?? | ??:??</Text>
+                    <View style={styles.matchRow}>
+                      <View style={styles.team}>
+                        <View style={styles.unknownLogo}>
+                          <Text style={styles.unknownLogoText}>?</Text>
+                        </View>
+                        <Text style={styles.teamName}>?</Text>
+                      </View>
+                      <View style={styles.scoreSection}>
+                        <Text style={styles.unknownScore}>?</Text>
+                        <Text style={styles.colon}>:</Text>
+                        <Text style={styles.unknownScore}>?</Text>
+                      </View>
+                      <View style={styles.team}>
+                        <View style={styles.unknownLogo}>
+                          <Text style={styles.unknownLogoText}>?</Text>
+                        </View>
+                        <Text style={styles.teamName}>?</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
             {roundHasOpenMatches && (
               <Text style={styles.instructions}>
                 בחרו תוצאה לכל משחק ולחצו שמור ניחושים
@@ -535,11 +592,11 @@ saveToastText: {
     flexDirection: 'row',
     backgroundColor: '#151515',
     borderRadius: 18,
-    padding: 5,
+    padding: ROUND_TABS_PADDING,
   },
 
   activeRound: {
-    width: 115,
+    width: ROUND_TAB_WIDTH,
     backgroundColor: 'limegreen',
     paddingVertical: 11,
     borderRadius: 14,
@@ -552,7 +609,7 @@ saveToastText: {
   },
 
   round: {
-    width: 115,
+    width: ROUND_TAB_WIDTH,
     paddingVertical: 11,
     alignItems: 'center',
   },
@@ -704,6 +761,27 @@ scoreButton: {
     fontSize: 15,
     fontWeight: '800',
     marginTop: 8,
+  },
+
+  unknownLogo: {
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    borderRadius: LOGO_SIZE / 2,
+    backgroundColor: '#252525',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  unknownLogoText: {
+    color: 'gray',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+
+  unknownScore: {
+    color: 'gray',
+    fontSize: 23,
+    fontWeight: '900',
   },
 
   lockedText: {

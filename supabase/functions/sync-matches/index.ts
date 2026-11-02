@@ -10,6 +10,12 @@ const LEAGUE_ID = '4644'; // Israeli Premier League
 const REQUEST_TIMEOUT_MS = 10_000;
 // Old rounds fetched per run when filling gaps, to stay under the rate limit
 const MAX_BACKFILL_ROUNDS = 5;
+// 26 regular-season rounds plus up to 10 in the championship playoff
+const LAST_ROUND = 36;
+// Later rounds fetched per run. Their dates rarely change, so each one is refreshed in
+// turn (a full pass takes under an hour at one run every 10 minutes).
+const MAX_FUTURE_ROUNDS = 6;
+const RUN_INTERVAL_MS = 10 * 60 * 1000;
 // No match can be over sooner than this after kickoff (90 minutes + half time)
 const MIN_MATCH_LENGTH_MS = 100 * 60 * 1000;
 const MAX_GOALS = 30;
@@ -205,6 +211,14 @@ Deno.serve(async (req) => {
         rounds.add(r);
         backfill++;
       }
+    }
+
+    // Rounds after the next one, so the whole season's fixtures can be browsed in the app
+    const future: number[] = [];
+    for (let r = nextRound + 2; r <= LAST_ROUND; r++) future.push(r);
+    const start = Math.floor(Date.now() / RUN_INTERVAL_MS) * MAX_FUTURE_ROUNDS;
+    for (let i = 0; i < Math.min(MAX_FUTURE_ROUNDS, future.length); i++) {
+      rounds.add(future[(start + i) % future.length]);
     }
 
     // One round failing to load shouldn't hold back the others
