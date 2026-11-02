@@ -20,6 +20,19 @@ const RUN_INTERVAL_MS = 10 * 60 * 1000;
 const MIN_MATCH_LENGTH_MS = 100 * 60 * 1000;
 const MAX_GOALS = 30;
 
+// TheSportsDB often lists a whole round at one placeholder time, so kickoff times come
+// from 365Scores when it has the game. Predictions lock by the round's first kickoff.
+const SCORES365_FIXTURES =
+  'https://webws.365scores.com/web/games/fixtures/' +
+  '?appTypeId=5&langId=2&timezoneName=Asia/Jerusalem&userCountryId=6&competitions=42';
+
+type Fixture365 = {
+  roundNum?: number;
+  startTime: string;
+  homeCompetitor: { name: string };
+  awayCompetitor: { name: string };
+};
+
 type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'cancelled';
 
 type ApiEvent = {
@@ -98,6 +111,40 @@ async function fetchEvents(path: string, retries = 1): Promise<ApiEvent[]> {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return fetchEvents(path, retries - 1);
   }
+}
+
+// Round + home + away -> kickoff (ms). Empty when 365Scores fails, so the sync then keeps
+// TheSportsDB's times instead of failing.
+async function fetchKickoffs365(retries = 1): Promise<Map<string, number>> {
+  const kickoffs = new Map<string, number>();
+  try {
+    const res = await fetch(SCORES365_FIXTURES, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`365Scores fixtures returned ${res.status}`);
+    const body = await res.json();
+    for (const g of (Array.isArray(body?.games) ? body.games : []) as Fixture365[]) {
+      const kickoff = Date.parse(g?.startTime);
+      if (!Number.isInteger(g?.roundNum) || Number.isNaN(kickoff)) continue;
+      if (!isText(g.homeCompetitor?.name) || !isText(g.awayCompetitor?.name)) continue;
+      kickoffs.set(fixtureKey(g.roundNum!, g.homeCompetitor.name, g.awayCompetitor.name), kickoff);
+    }
+  } catch (error) {
+    if (retries > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      return fetchKickoffs365(retries - 1);
+    }
+    console.warn('sync-matches: 365Scores kickoff times unavailable:', error);
+  }
+  return kickoffs;
+}
+
+// Both sources spell some names differently ("קריית"/"קרית", "תקווה"/"תקוה"),
+// so compare without vav, yod, punctuation and spaces. Same as sync-match-stats.
+function fixtureKey(round: number, home: string, away: string) {
+  const normalize = (name: string) => name.replace(/[וי"'׳״\s\-.]/g, '');
+  return `${round}|${normalize(home)}|${normalize(away)}`;
 }
 
 const isText = (value: unknown): value is string =>
@@ -222,11 +269,14 @@ Deno.serve(async (req) => {
     }
 
     // One round failing to load shouldn't hold back the others
-    const fetched = await Promise.allSettled(
-      [...rounds]
-        .filter((r) => r > 0)
-        .map((r) => fetchEvents(`eventsround.php?id=${LEAGUE_ID}&r=${r}&s=${season}`)),
-    );
+    const [fetched, kickoffs365] = await Promise.all([
+      Promise.allSettled(
+        [...rounds]
+          .filter((r) => r > 0)
+          .map((r) => fetchEvents(`eventsround.php?id=${LEAGUE_ID}&r=${r}&s=${season}`)),
+      ),
+      fetchKickoffs365(),
+    ]);
     const failedRounds = fetched.filter((f) => f.status === 'rejected').length;
     if (failedRounds > 0) console.warn(`sync-matches: ${failedRounds} round(s) failed to load`);
     const events = fetched.flatMap((f) => (f.status === 'fulfilled' ? f.value : []));
@@ -234,11 +284,20 @@ Deno.serve(async (req) => {
     const storedById = new Map(stored.map((m) => [m.external_id, m]));
     const matches = new Map<string, MatchRow>();
     let skipped = 0;
+    let retimed = 0;
     for (const event of events) {
       const match = toMatch(event, season);
       if (!match || event.strSeason !== season) {
         skipped++;
         continue;
+      }
+
+      if (match.status === 'scheduled') {
+        const kickoff = kickoffs365.get(fixtureKey(match.round, match.home_team, match.away_team));
+        if (kickoff !== undefined) {
+          match.kickoff_time = new Date(kickoff).toISOString();
+          retimed++;
+        }
       }
 
       // A graded match never goes back to ungraded: that would leave points awarded for a
@@ -271,6 +330,7 @@ Deno.serve(async (req) => {
       season,
       rounds: [...rounds].sort((a, b) => a - b),
       synced: matches.size,
+      retimed,
       skipped,
       failedRounds,
     });
