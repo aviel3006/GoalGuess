@@ -43,7 +43,7 @@ export default function TabsLayout() {
         options={{
           title: 'בית',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+            <Ionicons name="home-outline" size={size} color={color as string} />
           ),
         }}
       />
@@ -53,7 +53,7 @@ export default function TabsLayout() {
         options={{
           title: 'חוקים',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="document-text-outline" size={size} color={color} />
+            <Ionicons name="document-text-outline" size={size} color={color as string} />
           ),
         }}
       />
@@ -63,7 +63,7 @@ export default function TabsLayout() {
         options={{
           title: 'דירוג',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trophy-outline" size={size} color={color} />
+            <Ionicons name="trophy-outline" size={size} color={color as string} />
           ),
         }}
       />
@@ -72,7 +72,7 @@ export default function TabsLayout() {
   options={{
     title: 'אזור אישי',
     tabBarIcon: ({ color, size }) => (
-      <Ionicons name="person-outline" size={size} color={color} />
+      <Ionicons name="person-outline" size={size} color={color as string} />
     ),
   }}
 />

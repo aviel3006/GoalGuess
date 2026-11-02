@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '../hooks/use-session';
@@ -54,7 +55,7 @@ export default function WorldTablesScreen() {
   const [leagues, setLeagues] = useState<WorldLeague[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const chipsRef = useRef<ScrollView>(null);
+  const chipsRef = useRef<ScrollViewInstance>(null);
 
   const load = useCallback(async () => {
     const ids = favoritesKey ? favoritesKey.split(',').map(Number) : [];

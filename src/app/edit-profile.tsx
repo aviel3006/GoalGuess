@@ -442,7 +442,7 @@ function CountryPicker({
                   <Ionicons name="remove-circle-outline" size={22} color="#FF5A5F" />
                   <Text style={[styles.countryName, styles.clearCountry]}>ללא מדינה</Text>
                 </TouchableOpacity>
-              ) : null
+              ) : undefined
             }
             ListEmptyComponent={<Text style={styles.noResults}>לא נמצאו מדינות</Text>}
           />

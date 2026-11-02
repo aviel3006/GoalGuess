@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '../hooks/use-session';
@@ -51,7 +52,7 @@ export default function NewsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [now, setNow] = useState(() => Date.now());
-  const chipsRef = useRef<ScrollView>(null);
+  const chipsRef = useRef<ScrollViewInstance>(null);
   // Ignores answers to requests made before the filter changed
   const requestId = useRef(0);
 
@@ -334,7 +335,7 @@ export default function NewsScreen() {
             />
           }
           ListFooterComponent={
-            loadingMore ? <ActivityIndicator color={GREEN} style={styles.footerLoader} /> : null
+            loadingMore ? <ActivityIndicator color={GREEN} style={styles.footerLoader} /> : undefined
           }
           ListEmptyComponent={
             <View style={styles.empty}>

@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 
 import { useAchievementCelebration } from '../components/achievement-celebration';
 import { LOGO_SIZE, TeamLogo } from '../components/team-logo';
@@ -152,7 +153,7 @@ export default function PredictionsScreen() {
   }, [matches]);
 
   // Bring the selected round into view, since it can sit far along the tab strip
-  const roundTabsRef = useRef<ScrollView>(null);
+  const roundTabsRef = useRef<ScrollViewInstance>(null);
   const [roundTabsWidth, setRoundTabsWidth] = useState(0);
   const scrolledToRound = useRef(false);
   useEffect(() => {
